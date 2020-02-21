@@ -1,2 +1,26 @@
 This is going to be the new journal of stuff I do instead of using Adrian's repo because it's just a little messy.
 I also have 95% of my things written on paper and that is not a good thing so I should import that onto here.
+
+## Feb 17th
+- Very confused how everything is working due to organization of repo so I'm just gonna do my own thing and 
+keep in touch with Adrian and send eachother scripts
+- Need to redo GLM script because there is something wrong and it doesnt work
+
+## Feb 18th
+- Probelem is with spacial weight matrix (adjacency matrix)
+- Problem is probably very simple but I cant figure it out. Adrain is working on it as well
+- Not really sure how to figure it out. 
+- Adrain figured it out...
+
+## Feb 19th 
+- Adrain fixed adjacency matrix and put it in long format. Had to change alot of coord script and coord overlap
+- Changing up the GLM model. 
+- GLM is not converging. I have incidence factored but I feel like it isnt actually
+- Adrian figured out that it wasnt actually and data was not melted properly
+- GLM(incidence ~ num.shared + county1 + date, data = all.shared.users, family = binomial(link = "cloglog")
+- Should date and county be used as offsets instead????
+
+## Feb 20th
+- How do I interpret lambda's and exp-growth-rate.png 
+- And what do I do with county1 + date
+- Can I make more graphics for this model? Visualizations are v helpful
