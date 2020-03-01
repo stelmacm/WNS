@@ -2,7 +2,7 @@
 # fit glm model to data
 
 #model <- glm(as.factor(incidence) ~ num.shared + county1 + date ,data = all.shared.users, family = binomial(link = "cloglog"))
-model <- glm(as.factor(incidence) ~ offset(num.shared),data = all.shared.users, family = binomial(link = "cloglog"))
+model <- glm(as.factor(incidence) ~ offset(log(num.shared)),data = all.shared.users, family = binomial(link = "cloglog"))
 
 # I think this method is more correct. Plot for number of lambda's needs to change
 
