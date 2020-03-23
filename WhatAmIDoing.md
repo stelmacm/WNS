@@ -16,4 +16,4 @@
 - Played around with spreadr but its probably not it but just interested me 
 - Ran through Ben's examples in spatial and spatial_lab (Summary: Stuff I probably should have looked at first that summarizes everything
   I have just done up there ^)
- -Forgot to push this yesterday. oops. Need to get better with pushing
+-Forgot to push this yesterday. oops. Need to get better with pushing
