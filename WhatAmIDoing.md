@@ -17,3 +17,5 @@
 - Ran through Ben's examples in spatial and spatial_lab (Summary: Stuff I probably should have looked at first that summarizes everything
   I have just done up there ^)
 - Forgot to push this yesterday. oops. Need to get better with pushing
+- https://rpubs.com/nabilabd/118172 <- article about Kriging with sp 
+- I would like to learn more about SPDF because I feel like my knowledge there is very lacking
