@@ -12,7 +12,7 @@
 - Trying exaples of Seedy (epi package) for networking disease
 - I keep finding myself convinced that the answer for all my questions is in https://www.repidemicsconsortium.org/projects/ but I just
   don't know in which
-- Uploaded Proof for Ben
+- Uploading Proof for Ben
 - Played around with spreadr but its probably not it but just interested me 
 - Ran through Ben's examples in spatial and spatial_lab (Summary: Stuff I probably should have looked at first that summarizes everything
   I have just done up there ^)
