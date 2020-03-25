@@ -1,16 +1,5 @@
-## ATTEMPT 3
-
-# read in geocache list
-m_gc<-read.csv("data/cave-mines-not-complete.csv",header=T)
-
-# fix coords
-# on linux, encoding changes to "\xb0"
-m_gc$lat <- as.numeric(gsub("\xb0 ",".",gsub("[.]","",gsub(pattern = "N ",replacement = "",m_gc$lat))))
-m_gc$lon <- as.numeric(gsub("\xb0 ",".",gsub("[.]","",gsub(pattern = "W ",replacement = "-",m_gc$lon))))
-
-# creat the matrix
-pairwise.dist<-distm(m_gc[,c("lon","lat")],m_gc[,c("lon","lat")],fun=distHaversine)
-
+library(tidyverse)
+library(EpiILMCT)
 
 #ATTEMPT 5
 
@@ -19,14 +8,16 @@ pairwise.dist<-distm(m_gc[,c("lon","lat")],m_gc[,c("lon","lat")],fun=distHaversi
 
 #We begin by importing the caves
 
-caves <-read.csv("data/clean-coords.csv")
-caves$lat <- caves$X2
-caves$long <- caves$X1
+
+caves <- (read_csv("data/clean-coords.csv")
+    %>% rename(lat="X2",long="X1")
+)
 
 locations <- cbind(caves$lat, caves$long)
-net1 <- contactnet(type = "random", num.id = 726, location = locations, beta = 0.3)
+net1 <- contactnet(type = "random", num.id = 726,
+                   location = locations, beta = 0.3)
 plot(net1)
-infected <- 
+
   
 #ATTEMPT 4  
 
