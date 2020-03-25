@@ -19,3 +19,5 @@
 - Forgot to push this yesterday. oops. Need to get better with pushing
 - https://rpubs.com/nabilabd/118172 <- article about Kriging with sp 
 - I would like to learn more about SPDF because I feel like my knowledge there is very lacking
+- https://stats.stackexchange.com/questions/248113/are-50-confidence-intervals-more-robustly-estimated-than-95-confidence-interva
+- Andrew Gelman's paper
