@@ -50,3 +50,4 @@ Need to find a way to ensure as.factor converts nicely.
 - I think I want to segment the individual years from the dataframe and basically run through each year. (currently just have 1 big simulation happening in attempt to start small and move up)
 - Not many things flow too nicely with drake so I might need to reorganize things in a nicer way so Ben can just run them quicker and easier instead of sifting through unorganized code.
 - Currently everything is mixed in here and ther in spatial-weight-matrix.R, geocache-weights.R, randomnonsense and randomscripts on my laptop (try and out it all in one new one)
+- So I just did everything wrong but now I get everything??? There's no positive here. I just have to redo it
