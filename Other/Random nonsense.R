@@ -1,116 +1,66 @@
-library(tidyverse)
-library(EpiILMCT)
+library(rlang)
+library(esri2sf)
 
-#ATTEMPT 5
+relevant.records <-read.csv("data/relevant-records.csv", header=TRUE) 
+wnspresence <- wnspresence[,-c(2,18)]
+head(wnspresence)
+unique(wnspresence$year)
 
-# I want to get the x y of all the counties in our dataset and convert them to neighbors
-# this will be done via tri2nb function in deldir
+url2 <- "https://www.sciencebase.gov/arcgis/rest/services/Catalog/59d45504e4b05fe04cc3d3e0/MapServer/2"
+df2 <- as.data.frame(esri2sf(url2))
+head(df2)
 
-#We begin by importing the caves
-
-
-caves <- (read_csv("data/clean-coords.csv")
-    %>% rename(lat="X2",long="X1")
-)
-
-locations <- cbind(caves$lat, caves$long)
-net1 <- contactnet(type = "random", num.id = 726,
-                   location = locations, beta = 0.3)
-plot(net1)
-
-  
-#ATTEMPT 4  
-
-#Randomize and just like make some random data first 
-loc <- cbind(runif(10, 0, 10), runif(10,0,10))
-net <- contactnet(type = "random", num.id = 10, location = loc, beta = 0.3)
-infection <- c(2.5, 1, 0, 0, 0.5, 0, 2, 1.5, 0, 3)
-removal <- c(3.5, 2, 0, 1, 1.5, 0, 3, 2.5, 0, 4)
-id <- c(2, 1, 4, 7, 10, 3, 5, 9, 8, 6)
-epi <- as.epidat(type = "SIR", kerneltype = "distance", inf.time = infection,
-                 rem.time = removal, id.individual = id, location = loc)
-epi
-# using the data set from the library (obviously given to practice on)
-data(NetworkDataSINR)
-netSINR<-as.epidat(type = "SINR", kerneltype = "network",
-                   incub.time = NetworkDataSINR$epi[,4], inf.time = NetworkDataSINR$epi[,6],
-                   rem.time = NetworkDataSINR$epi[,2], id.individual = NetworkDataSINR$epi[,1],
-                   location = NetworkDataSINR$loc, network = NetworkDataSINR$net,
-                   network.type = "powerlaw")
-plot(netSINR, plottype = "history")
-#Look into interpretting other plot types
-#I dont like N I want SIR
-netSIR<-as.epidat(type = "SIR", kerneltype = "network",
-                  inf.time = NetworkDataSINR$epi[,6], rem.time = NetworkDataSINR$epi[,2],
-                  id.individual = NetworkDataSINR$epi[,1], location = NetworkDataSINR$loc,
-                  network = NetworkDataSINR$net, network.type = "powerlaw")
-plot(netSIR, plottype = "history")
-# OK looks decent, lets try this with my bat data now
+url5 <- "https://www.sciencebase.gov/arcgis/rest/services/Catalog/59d45504e4b05fe04cc3d3e0/MapServer/5"
+df5 <- as.data.frame(esri2sf(url5))
+head(df5)
 
 
-#ATTEMPT 1 
+presence.df <- rbind(df2, df5)
+presence.df$rownumber = 1:nrow(presence.df)
+presence.poly <- as_Spatial(presence.df$geoms)
+#Take the CSV so we have something to go forward with
+write.csv(file="whitenosepresence.csv",presence.df) 
 
-# Start with matrix of individuals of indivuals infected
-individ <- c(10, 0, 0)
+unique(presence.df$WNS_STATUS)
 
-#Have 3 places the indivuals can travel to 
-A <- matrix( c(.1, .3, .6,
-               .2, .4, .4,
-               .3, .2, .5), nrow=3, byrow=TRUE)
-A
+#Convert infection status to binary
+presence.df$WNS_STATUS[presence.df$WNS_STATUS == "Confirmed"] <- 1
+presence.df$WNS_STATUS[presence.df$WNS_STATUS == "Suspect"] <- 0
 
-#Now that I have a transition matrix of an individual going from state i to state j
-#I want to have the probability of each edge cause each individual to move for each iteration
+unique(presence.df$WNS_STATUS)
 
-#This is going to be a for loop that iterates through 10 time steps for every j individual
-T <- 10
-for(t in 1:T){
-  for(j in 1:3){
-    x <- individ[j]
-    u <- runif(x)
-    cy <- cumsum(y)
-    
-  }
-  
-}
+#Create spatial matrix from all of this
+#First fit the counties into spatial set
 
-# ATTEMPT 2
+#THIS IS ALL GARBAGE
 
-require(deSolve)
-sir.model <- function (t, x, params) {
-  S <- x[1] #susceptibles
-  I <- x[2] #infected
-  R <- x[3] #recovered
-  with(
-    as.list(params), #local environment to evaluate derivatives
-    {
-      dS <- mu*(N)-beta*S*I/N-mu*S
-      dI <- beta*S*I/N-(mu+gamma)*I
-      dR <- gamma*I-mu*R
-      dx <- c(dS,dI,dR)
-      list(dx)
-    }
-  )
-}
+presence.df1 <- presence.df[order(presence.df$WNS_MAP_YR),]
+presence.df1[1:46,] <- presence.df1$INITIAL == 1
+presence.df1$INITIAL[46:nrow(presence.df1),] <- 0
+#Ok so this is the first geocache locations found.
+#What we could do is just go and set the remaining ones equal to 0
+#Or we could keep them as is.
+#I think becuase there is such a range in years that 
+presence.df2 <- presence.df1[1:46,]
 
 
-R0 <- function(params) with(as.list(params), beta/(mu+gamma))
+# THIS ISNT GARBAGE
 
-times <- seq(0,30,by=1/120)
-params <- c(mu=1/70,N=1,beta=400,gamma=365/14)
-xstart <- c(S=1-0.001-0.9,I=0.001,R=0.9)
+initialvec <- (presence.df$WNS_STATUS)
+#ok so that was useless
+#If we go through relevant records, we can create the proper weight matrix which we want
+#county.m is the metrix in question
 
-op <- par(fig=c(0,1,0,0.5),mar=c(4,4,2,5))
-plot(I~S,data=out,type='b',log='xy',yaxt='n',xlab='S',cex=0.5)
-par(fig=c(0,1,0.5,1),mar=c(4,4,2,5), new=TRUE)
-plot(S~time,data=out,type='l', ylim=c(0,0.1), xlab='Time')
-lines(I~time,data=out,type='l',col='red'); par(new=TRUE)
-plot(R~time,data=out,type='l', ylim=c(0.9,1), col='blue', axes=FALSE,
-     + xlab='', ylab='', main=paste('R(0) =',round(R0(params),2)), cex.main=0.9)
-axis(4)
-mtext('R', side=4, line=3)
-legend('topright', legend=c('Susceptible', 'Infectious', 'Recovered'), col=c('black','red','blue'), lty=1, bty='n', cex=0.8)
-par(op)
-
-
+#Question I have is my ivec suppose to be just 2008 or the whole column throughout all the years
+#nrow of presence.df and county.m is both 727 so I think that is the way to go
+#Errors occuring in matrix multiplication because I think WNS_STATUS is a character not numeric
+uninf <- (initialvec) == 0
+movement <- (county.m)%*%as.numeric(initialvec)
+beta <- -0.19
+FOI <- beta * movement
+hazard <- 1 - exp(FOI)
+#I think the size is right. Right?
+intialvec[uninf] <- rbinom(sum(uninf), size = 727, prob = hazard)
+#Ok so this works fantastically
+#Now we need to change a weight matrix per year
 
