@@ -50,4 +50,6 @@ Need to find a way to ensure as.factor converts nicely.
 - I think I want to segment the individual years from the dataframe and basically run through each year. (currently just have 1 big simulation happening in attempt to start small and move up)
 - Not many things flow too nicely with drake so I might need to reorganize things in a nicer way so Ben can just run them quicker and easier instead of sifting through unorganized code.
 - Currently everything is mixed in here and ther in spatial-weight-matrix.R, geocache-weights.R, randomnonsense and randomscripts on my laptop (try and out it all in one new one)
-- So I just did everything wrong but now I get everything??? There's no positive here. I just have to redo it
+- So I just did everything wrong but now I understand everything??? There's no positive here. I just have to redo it. 
+- Initial vector isn't correct. The vector is only for each given location when they appear for the first time. If I do only ones that appear only in 2008 (ie initial it makes it 31 counties that are recorded). I guess the problem might be the sparsity of the weight matrix. I get now that ivec should be updating itself but I cant see how the weight matrix should be changing from year to year if infection state matrix is.
+ 
