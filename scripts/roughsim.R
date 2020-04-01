@@ -29,7 +29,7 @@ y2019 <- filter(relevant.records, Year == "2019")
 
 polymatch <-sp::over(y2008.p, as_Spatial(presence.df$geoms),fn=NULL)
 
-#from this boyo we wanna grab the list of unique polygons
+#from this thingy we wanna grab the list of unique polygons
 #any(is.na(y2008unique.df))
 #is it worth just putting na.omit or should I check is all of them have Na's 
 y2008unique.df<-presence.df[(unique(polymatch)),]
@@ -40,7 +40,6 @@ y2008unique.df<-presence.df[(unique(polymatch)),]
 collectivecounty <- y2008unique.df$geoms %>% st_centroid() %>%
   st_transform(.,"+proj=longlat +datum=WGS84")
 
-#wait am I doing it wrong???
 #Create neighbor list from centroids
 y2008neighbors <- poly2nb(as_Spatial(presence.df$geoms))
 
@@ -60,6 +59,20 @@ y2008matrix <- nb2mat(y2008neighbors, style = "B", zero.policy = TRUE)
 #Cool so this probably would be super efficient in a for loop....
 #My goal is to put all these matracies in a list
 
-
 #Lets try just the first step with ivec
+initialvec <- (presence.df$WNS_STATUS)
 
+#If we go through relevant records, we can create the proper weight matrix which we want
+#y2008matrix is the metrix in question
+#Alternatively county.m is the constant weight matrix of all the counties from the beginning 
+
+#Errors occuring in matrix multiplication because I think WNS_STATUS is a character not numeric
+uninf <- (initialvec) == 0
+movement <- (y2008matrix)%*%as.numeric(initialvec)
+beta <- -0.19
+FOI <- beta * movement
+hazard <- 1 - exp(FOI)
+#I think the size is right. Right?
+intialvec[uninf] <- rbinom(sum(uninf), size = 727, prob = hazard)
+#Ok so this works but its doesn't feel like its intuitively right to me
+#Now we need to change a weight matrix per year and add a for loop to have it all process
