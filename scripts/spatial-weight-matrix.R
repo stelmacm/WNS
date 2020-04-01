@@ -38,6 +38,7 @@ county.w$weights[sapply(county.w$weights, is.null)] <- 0
 weights.long<-unlist(county.w$weights,use.names = T)
 
 # spatial weight matricies from neighbour list
-# county.m <- nb2mat(county.n, style = "B", zero.policy = T)
+ county.m <- nb2mat(county.n, style = "B", zero.policy = T)
 
 list(time = Sys.time(), tempfile = tempfile())
+  
