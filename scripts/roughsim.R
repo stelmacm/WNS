@@ -21,6 +21,8 @@ y2017 <- filter(relevant.records, Year == "2017")
 y2018 <- filter(relevant.records, Year == "2018")
 y2019 <- filter(relevant.records, Year == "2019")
 
+#All of this ^ needs to be done in a better way
+
 # now I want to find contact contact counties for each respective year
 # at the spatial locations of object x retrieves the indexes or attributes from spatial object y
 # index for sites that match up with polys?? Can confirm yes that is what I am doing
@@ -67,12 +69,39 @@ initialvec <- (presence.df$WNS_STATUS)
 #Alternatively county.m is the constant weight matrix of all the counties from the beginning 
 
 #Errors occuring in matrix multiplication because I think WNS_STATUS is a character not numeric
-uninf <- (initialvec) == 0
-movement <- (y2008matrix)%*%as.numeric(initialvec)
-beta <- -0.19
-FOI <- beta * movement
-hazard <- 1 - exp(FOI)
+
+#Now we are going to a for loop process
+
+#psudo code is:
+#After a initial matrix has been defined for starting values
+#For every year i in the list of years (which contains 2008-2019)
+#uninf <- (initialvec) == 0
+#movement <- (y2008matrix)%*%as.numeric(initialvec)
+#beta <- -0.19
+#FOI <- beta * movement
+#hazard <- 1 - exp(FOI)
 #I think the size is right. Right?
-intialvec[uninf] <- rbinom(sum(uninf), size = 727, prob = hazard)
-#Ok so this works but its doesn't feel like its intuitively right to me
-#Now we need to change a weight matrix per year and add a for loop to have it all process
+#initialvec[uninf] <- rbinom(sum(uninf), size = 727, prob = hazard)
+#return(initialvec)
+#Ok so this works but its doesn't feel like its intuitively right to me with what is meant by year changing matrix
+
+year <- c(2008:2019)
+currentyear <- 2008
+countymatrix <- list(y2008,y2009,y2010,y2011,y2012,y2013,y2014,y2015,y2016,y2017,y2018,y2019)
+
+while(currentyear < 2020){
+  uninf <- (initialvec) == 0
+  #Currently using a time averaged matrix until can think a little more about iterating through the list of matricies
+  movement <- (county.m)%*%as.numeric(initialvec)
+  beta <- -0.19
+  FOI <- beta * movement
+  hazard <- 1 - exp(FOI)
+  #I think the size is right. Right?
+  initialvec[uninf] <- rbinom(sum(uninf), size = 727, prob = hazard)
+  return(initialvec)
+  currentyear<- currentyear + 1
+}
+
+
+#Ask Ben about GAM's from mcgv and gam package and why should one be used over the other. Mildly understand that the scatterplot
+#aspect matters into the actual model itself. 
