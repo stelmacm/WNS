@@ -53,3 +53,8 @@ Need to find a way to ensure as.factor converts nicely.
 - So I just did everything wrong but now I understand everything??? There's no positive here. I just have to redo it. 
 - Initial vector isn't correct. The vector is only for each given location when they appear for the first time. If I do only ones that appear only in 2008 (ie initial it makes it 31 counties that are recorded). I guess the problem might be the sparsity of the weight matrix. I get now that ivec should be updating itself but I cant see how the weight matrix should be changing from year to year if infection state matrix is.
 - Implemented the while loop instead of a for loop. Not sure if it matters. But its just bothers me that I cant think of a way to iterate through the list of weight matricies. I think I'll get it I just need to spend more time on it.
+
+## Week of April 5th
+- GLMM of model infected ~ adjecency + year + (1|site) 
+- (1|site) means only intercpets by random factor to my understanding. 
+- reading https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
