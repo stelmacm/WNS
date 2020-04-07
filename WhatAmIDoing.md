@@ -60,3 +60,4 @@ Need to find a way to ensure as.factor converts nicely.
 - reading https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
 - Finally found out what was wrong with Weight matrix per year. Polygons from the two datasets are not same. Update try and use only relevant.records, ask Adrian what happened in the scrape and which one will ultimately be more accurate.
 - Now question is after I fix clean up the data and use their dates instead will it include all the same locations? lets find out
+- Worked on final projects for time series and statistical learning
