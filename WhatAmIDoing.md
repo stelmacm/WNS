@@ -61,3 +61,4 @@ Need to find a way to ensure as.factor converts nicely.
 - Finally found out what was wrong with Weight matrix per year. Polygons from the two datasets are not same. Update try and use only relevant.records, ask Adrian what happened in the scrape and which one will ultimately be more accurate.
 - <s> Now question is after I fix clean up the data and use their dates instead will it include all the same locations? lets find out </s> Polygon creation is in coordinate-overlap.R Attempted modifications had errors with incorporating list of lists so I'm close?
 - Worked on final projects for time series and statistical learning
+- I wonder if glmm should be incidence ~ (1|county1) + (1|county2) + log(numberofsharedusers) just as a starter...
