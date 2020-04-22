@@ -62,3 +62,17 @@ Need to find a way to ensure as.factor converts nicely.
 - <s> Now question is after I fix clean up the data and use their dates instead will it include all the same locations? lets find out </s> Polygon creation is in coordinate-overlap.R Attempted modifications had errors with incorporating list of lists so I'm close?
 - Worked on final projects for time series and statistical learning
 - I wonder if glmm should be incidence ~ (1|county1) + (1|county2) + log(numberofsharedusers) just as a starter...
+
+## Week of April 12th
+- Exams and read about mixed models
+- Settled for infected ~ random(county1) + random(county2) + fixed(year)
+- I think a golden rule is to never make time a fixed effect so that might defeat the purpose but yeah
+
+## Week of April 19th
+- Finished Exams (woot woot)
+- Reviewed stuff with Adrian regarding the data (added washington state and cali)
+- Had to redo sim because the adjacency matrix was actually site based instead of county
+- Tried out using TMB. Not a fan. Generally not a fan of C
+- Came across glmmTMB and became a fan very quickly
+- Very much so like what it does but does it make sense for me to use?
+- Also have been working in the geocache repo instead of this one. oops
