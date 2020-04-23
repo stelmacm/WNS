@@ -79,3 +79,4 @@ Need to find a way to ensure as.factor converts nicely.
 - MUCH bigger learning curve to TMB than I orginally thought.
 - I don't use make rules so this might be iffy
 - "It is better to minimize the negative log-likelihood than maximize the log likelihood
+- Working with chapter 6 from Ben's book
