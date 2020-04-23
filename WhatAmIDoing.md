@@ -76,3 +76,6 @@ Need to find a way to ensure as.factor converts nicely.
 - Came across glmmTMB and became a fan very quickly
 - Very much so like what it does but does it make sense for me to use?
 - Also have been working in the geocache repo instead of this one. oops
+- MUCH bigger learning curve to TMB than I orginally thought.
+- I don't use make rules so this might be iffy
+- "It is better to minimize the negative log-likelihood than maximize the log likelihood
