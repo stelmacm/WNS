@@ -4,7 +4,10 @@
   url5 <- "https://www.sciencebase.gov/arcgis/rest/services/Catalog/59d45504e4b05fe04cc3d3e0/MapServer/5"
   df5 <- as.data.frame(esri2sf(url5))
   presence.df <- rbind(df2, df5)
-  presence.df$rownumber = 1:nrow(presence.df)
+  presence.df <- presence.df %>% 
+    mutate(county = paste0(trimws(gsub(pattern = "County.*$",replacement = "",COUNTYNAME)),"-",STATEPROV),
+           date=dmy(paste0("01-01",gsub(pattern = "-.*$",replacement = "",WNS_MAP_YR))),
+           year=year(date),
+           rownumber = 1:nrow(.))
   presence.poly <- as_Spatial(presence.df$geoms)
-  # list(time = Sys.time(), tempfile = tempfile())
-
+  list(time = Sys.time(), tempfile = tempfile())
