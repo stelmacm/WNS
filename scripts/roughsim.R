@@ -68,3 +68,25 @@ while(currentyear < 2020){
   print(initialvec)
   currentyear<- currentyear + 1
 }
+
+
+#Different version of the Sim. Probably the better version
+
+both.weights<-read.csv("data/gc-shared-users.csv",header=T)
+
+# there are no records from 2016? wierd.
+
+# just loop 'em!
+for (i in 2008:2019) {
+  x<-both.weights %>%
+  filter(year==i) %>%
+  select(county1,county2,touching) %>%
+  pivot_wider(names_from = county2,values_from = touching) %>%
+  replace(is.na(.), 0)
+  row.names(x)<-x$county1
+  x<-x[,-1]
+  assign(paste0("y",i),x)
+}
+
+#Lets try just the first step with ivec
+initialvec <- (both.weights$incidence)
