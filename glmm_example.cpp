@@ -1,4 +1,6 @@
 #include <TMB.hpp>
+#include <iostream>
+#include <string>
 
 template<class Type>
 Type objective_function<Type>::operator() ()
@@ -23,6 +25,7 @@ Type objective_function<Type>::operator() ()
   // assume cloglog link
   for (int i=0; i<nobs; i++) {
     mu(i) = Type(1) - exp(-exp(eta(i)));
+    std::cout << "inside obs loop " << i << " " << eta(i) << " " << mu(i) << std::endl;
     // subtract neg log likelihood
     jnll -= dbinom(yobs(i), Type(1), mu(i), true);
   }
@@ -30,6 +33,8 @@ Type objective_function<Type>::operator() ()
   // NLL of random effects
   for( int i=0; i<b.size(); i++){
     jnll -= dnorm(b(i), Type(0.0), exp(re_logsd), true);
+    // debugging statement
+    std::cout << "inside random effect loop " << i << " " << b(i) << std::endl;
   }
 
   return jnll;

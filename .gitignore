@@ -2,3 +2,6 @@
 ## compiled files
 *.o
 *.so
+*.Rout
+.RData
+.Rhistory
