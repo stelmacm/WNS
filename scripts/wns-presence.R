@@ -6,8 +6,8 @@
   presence.df <- rbind(df2, df5)
   presence.df <- presence.df %>% 
     mutate(county = paste0(trimws(gsub(pattern = "County.*$",replacement = "",COUNTYNAME)),"-",STATEPROV),
-           date=dmy(paste0("01-01",gsub(pattern = "-.*$",replacement = "",WNS_MAP_YR))),
-           year=year(date),
+           date=lubridate::dmy(paste0("01-01",gsub(pattern = "-.*$",replacement = "",WNS_MAP_YR))),
+           year=lubridate::year(date),
            rownumber = 1:nrow(.))
   presence.poly <- as_Spatial(presence.df$geoms)
   list(time = Sys.time(), tempfile = tempfile())
