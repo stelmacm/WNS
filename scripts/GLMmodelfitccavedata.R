@@ -1,10 +1,8 @@
 ##cave dataset
 # fit glm model to data
-
-#model <- glm(as.factor(incidence) ~ num.shared + county1 + date ,data = all.shared.users, family = binomial(link = "cloglog"))
-model <- glm(as.factor(incidence) ~ offset(log(num.shared)),data = all.shared.users, family = binomial(link = "cloglog"))
-
-# I think this method is more correct. Plot for number of lambda's needs to change
+model <- glm(as.factor(incidence) ~ as.factor(touching) ,data = both.weights, family = binomial(link = "cloglog"))
+summary(model)
+# Is p value worth keeping in here?
 
 #intrinsic growth rate of infection
 lambda=as.numeric(model$coefficients[2])
@@ -16,7 +14,7 @@ R0=(lambda/gamma)+1 #basic reproduction number
 
 # taking the total number of sites infected per year and the cumulative sum
 cave_rate<-relevant.records %>% 
-  mutate(date=ymd(wns.map.yr)) %>%
+  mutate(date=lubridate::ymd(wns.map.yr)) %>%
   arrange(date) %>%
   group_by(date) %>%
   summarise(cave.count = length(unique(GC))) %>% 
@@ -30,5 +28,3 @@ plot(cave_rate$inf.caves,cave_rate$cave.count,
 abline(a=1, b=lambda, col='brown',lwd=2)
 title(substitute(paste("Exponential growth rate", ~lambda," = ",lambdaval), list(lambdaval=round(lambda,2))))
 dev.off()
-#Stll missing some parts
-#
