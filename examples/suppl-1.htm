@@ -1,0 +1,186 @@
+<!--?php include 'header.php'; ?--><!doctype html><html><head>
+        <meta http-equiv="Content-Type" content="text/html, charset=UTF-8">
+        <title>Ecological Archives A025-033-S1</title>
+        
+        <script type="text/javascript" src="http://www.esapubs.org/templates/scripts/analytics.js"></script>
+    <style type="text/css">
+body {background-color: #FFF; font-family: Times New Roman, Times, serif;}
+
+hr {
+	height: .15em;
+	color: gray;
+	background-color: gray;
+	border-width: 0;
+}
+hr.divider {
+	width: 50em;
+	margin-top: 1.7em;
+	margin-bottom: 2em;
+	margin-left: 0;
+}
+
+p {max-width: 50em;}
+
+li {max-width: 48em;}
+
+sub, sup {font-size: .7em;}
+
+table, td {
+	border: 1px solid black;
+	border-collapse: collapse;
+	text-align: center;
+    vertical-align: top;
+}
+td {max-width: 70em; padding: .1em;}
+table, tr {
+	padding: .1em;}
+tr:first-child {font-weight: bold;}
+
+table.equation {border: none; width: 48em;}
+.equation td {border: none; text-align: left; vertical-align: middle;}
+.equation tr:first-child {font-weight: normal;}
+.equation td:last-child {text-align: right; width: 3em;}
+
+table.noFormat {border: none; text-align: inherit;}
+.noFormat td {border: none; text-align: inherit;}
+.noFormat tr:first-child {font-weight: normal;}
+
+/* Position modifiers.  Use these to alter placement of elements on the page. */
+
+.center {margin-left: auto; margin-right: auto; text-align: center;}
+.textCenter {text-align: center;}
+.textLeft  {text-align:left;}
+
+.indent {margin-left: 2em;}
+p.indent {max-width: 48em;}
+p.heading.indent {max-width: 40em;}
+.halfIndent {margin-left: 1em;}
+
+/* Font modifiers.  Use these to alter font style and type. */
+
+.courier {font-family: Courier new, Courier, mono;}
+.heading {max-width: 45em; margin-top: .7em; font-size: 1.2em; font-weight: bold;}
+.overline {text-decoration: overline;}
+.over {text-decoration: overline;}
+.roman{font-style: normal; text-decoration: none; font-weight: normal;}
+.smallcaps {font-variant: small-caps;}
+
+#links {font-size: .7em; font-family: Arial, Helvetica, sans-serif;}
+</style></head>
+    <body bgcolor="#FFFFFF" leftmargin="20em">
+        <p class="heading">Suzanne M. O'Regan, Krisztian Magori, J. Tomlin Pulliam, Marcus A. Zokan, RajReni B. Kaul, Heather D. Barton, John M. Drake. 2015. Multi-scale model of epidemic fade-out: Will local extirpation events inhibit the spread of white-nose syndrome?. <i>Ecological Applications</i> 25:621–633. <a href="http://dx.doi.org/10.1890/14-0417.1">http://dx.doi.org/10.1890/14-0417.1</a></p>
+        <hr>
+        <p class="heading">Supplement</p>
+        <p class="heading indent">
+            Data, R source code, and script files to perform analysis and simulation of multi-scale models.
+            <br><i>Ecological Archives</i> A025-033-S1.
+        </p>
+        <p style="font-weight: bold;"><a href="../../../copyright.htm">Copyright</a></p>
+        <hr>
+        <p class="heading indent">
+            <a href="#authors">Authors</a><br>
+            <a href="#filelist">File list (downloads)</a><br>
+            <a href="#desc">Description</a>
+        </p>
+        <hr>
+        <!-- Content starts here!  Don't delete anything before this! -->
+        <p id="authors" class="heading">Author(s)</p>
+        <div class="indent">
+            <p class="indent">Suzanne M. O'Regan<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Email: <a href="about:blank">smoregan@uga.edu</a><br>
+            </p>
+            <p class="indent"> Krisztian Magori<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Current address:<br>
+              Department of Biology<br>
+              Eastern Washington University<br>
+              Cheney, Washington 99004<br>
+              Email: <a href="about:blank">kmagori@ewu.edu</a><br>
+            </p>
+            <p class="indent"> J. Tomlin Pulliam<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Email: <a href="about:blank">tomlinp@uga.edu</a><br>
+            </p>
+            <p class="indent"> Marcus A. Zokan<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Email: <a href="about:blank">mzokan@yahoo.com</a><br>
+            </p>
+            <p class="indent"> RajReni B. Kaul<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Email: <a href="about:blank">reni@uga.edu</a><br>
+            </p>
+            <p class="indent"> Heather D. Barton<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602<br>
+              Current address:<br>
+              Department of Biology<br>
+              Grove City College<br>
+              Grove City, Pennsylvania 16127<br>
+              Email: <a href="about:blank">hdbarton@gcc.edu</a><br>
+            </p>
+            <p class="indent"> John M. Drake<br>
+              Odum School of Ecology<br>
+              University of Georgia<br>
+              Athens, Georgia 30602, USA<br>
+              Department of Zoology<br>
+              University of Oxford<br>
+              South Parks Road, Oxford OX1 3PS, UK<br>
+              Email: <a href="about:blank">jdrake@uga.edu</a><br>
+            </p>
+            
+        </div>
+        <hr>
+        <p id="filelist" class="heading">File list</p>
+        <div class="indent">
+            <p><font face="Courier New, Courier, mono"><a href="CountyDurationsScript.R">CountyDurationsScript.R</a>  (MD5:  11c986e429c95939119dfba189c36f31)<br>
+                <a href="frag_runner.r">frag_runner.r</a>  (MD5:  2f7485ebe2d2ad6f87c731dc1409124f)<br>
+                <a href="GammaDistributedCountyDurationsScript.R">GammaDistributedCountyDurationsScript.R</a>  (MD5:  564c893438c156880dbf7c72bf01f9de)<br>
+                <a href="GLMModelFitCaveData.R">GLMModelFitCaveData.R</a>  (MD5:  f184fb5e3fae0854c0be7c537548a551)<br>
+                <a href="NYPA_caves_infections.csv">NYPA_caves_infections.csv</a>   (MD5:  8e48980a329d637d317af5211ba5e3b4)<br>
+                <a href="si_dur.Rdata">si_dur.Rdata</a>  (MD5:  91473c25d66a90f099d3564e5a87f443)<br>
+                <a href="us_data.csv">us_data.csv</a>  (MD5:  37d75dbf0e9966f305c7fc4ef562abde)<br>
+                <a href="us_data_dur.csv">us_data_dur.csv</a>  (MD5:  6d6e2fea108b8d4ac05b86ff31a54959)<br>
+                <a href="WNS-GT-Duration.R">WNS-GT-Duration.R</a>  (MD5:  688935e135f35abddcb4ff6321a3e7c4)</font>
+            </p>
+        </div>
+        <p id="desc" class="heading">Description</p>
+        <div class="indent">
+            <p><font face="Courier New, Courier, mono">CountyDurationsScript.R</font> - R script to calculate county infection durrations assuming exponentialy distributed hibernaculum infection times.<br>
+              <font face="Courier New, Courier, mono">frag_runner.r</font> - R script to simulate SIR and SI epidimics<br>
+              <font face="Courier New, Courier, mono">GammaDistributedCountyDurationsScript.R</font> - R script to calculate county infection durrations assuming gamma distributed hibernaculum infection times<br>
+              <font face="Courier New, Courier, mono">GLMModelFitCaveData.R</font> - R script to parameterize the county model by fitting a GLM to incidence data from New York and Pennsylvania<br>
+              <font face="Courier New, Courier, mono">NYPA_caves_infections.csv</font> - Incidence data from Ney Yourk and Pennsylvania used to parameterize the county model<br>
+              <font face="Courier New, Courier, mono">si_dur.Rdata</font> - Calculated county infection durration data assuming an SI county model<br>
+              <font face="Courier New, Courier, mono">us_data.csv</font> - Data table of cave counts and WNS incidence from Maher et al.<br>
+              <font face="Courier New, Courier, mono">us_data_dur.csv</font> - Copy of us_data.csv with added county infection durration column<br>
+              <font face="Courier New, Courier, mono">WNS-GT-Duration.R</font> - R function definitions to simulate epidimics
+            </p>
+        </div>
+        <p id="desc" class="heading">Literature Cited</p>
+        <div class="indent">Maher, S. P., A. M. Kramer, J. T. Pulliam, M. A. Zokan, S. E. Bowden, H. D. Barton, and J. M. Drake. 2012. Spread of white-nose syndrome on a network regulated by geography and climate. Nature Communications 3:1306. doi:10.1038/ncomms2301
+        
+        </div>
+    <!-- Content stops here!  Don't delete anything after this! -->
+        <hr>
+        <p id="links" class="center">
+            <a href="../../../../default.htm" target="_top">ESA Publications</a> |
+            <a href="../../../default.htm" target="_top">Ecological Archives</a> |
+            <a href="../../../copyright.htm" target="_top">Permissions</a> |
+            <a href="../../../citation.htm" target="_top">Citation</a> |
+            <a href="../../../contacts.htm" target="_top">Contacts</a>
+        </p>
+    
+
+<!--?php mysql_close($con); ?--></body></html>
