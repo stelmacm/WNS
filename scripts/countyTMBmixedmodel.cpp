@@ -7,6 +7,7 @@ Type objective_function<Type>::operator() ()
   DATA_VECTOR(yobserved);
   DATA_MATRIX(mixedmodelx);
   DATA_SPARSE_MATRIX(Z);
+  DATA_VECTOR(offset);
   
   PARAMETER_VECTOR(beta);
   PARAMETER_VECTOR(b);
@@ -18,7 +19,7 @@ Type objective_function<Type>::operator() ()
   vector<Type> mu(nobs);
   
   // Linear predictor
-  vector<Type> eta = mixedmodelx * beta + Z * b;  // + offset?
+  vector<Type> eta = mixedmodelx * beta + Z * b + offset;
     
     // assume cloglog link
   for (int i=0; i<nobs; i++) {
