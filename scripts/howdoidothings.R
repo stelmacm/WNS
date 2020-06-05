@@ -1,11 +1,17 @@
 library(tidyverse)
 library(lme4)
+library(cowplot)
+library(lattice)
+library(ggplot2)
 #What I have tried
 
 #Tried to change df such that it looks like binomial version of mixedmodel df
 #so it looks like this 
 
-practicedf <- read_csv("data/mixedmodelpractice.csv")
+
+practicedf <- (read_csv("data/mixedmodelpractice.csv")
+    %>% mutate_at("year_f", factor)
+)
 
 #and it has no recovery stage (as per Adrian) 
 #I tried to fit this into first just a mixed model and got singularity which makes sense
@@ -13,8 +19,62 @@ practicedf <- read_csv("data/mixedmodelpractice.csv")
 
 #Now if I tried the same line but with the binomial df it shouldnt work 
 
-m1 <- glmer(incidence ~ year_f + (1|county), family=binomial(link = "cloglog"), data=practicedf)
-#model fails to coverge which is clearly just a bad model
+m1 <- glmer(incidence ~ year_f + (1|county),
+            family=binomial(link = "cloglog"), data=practicedf)
+
+tt <- with(practicedf, table(incidence,year_f))
+
+## make year a random effect instead
+m2 <- update(m1, . ~ . -year_f + (1|year_f))
+plot_grid(plotlist=dotplot(ranef(m2)))
+
+m3 <- glm(incidence ~ year_f,
+          family=binomial(link = "cloglog"), data=practicedf)
+
+## eliminate all-0 or all-1 years
+m4 <- update(m3, subset=year>2008 & year<2018)
+
+## add 1 to avoid zero-incidence (log() = -Inf) problems
+m5 <- update(m2, . ~ . + offset(log(lag(incidence)+1)))
+plot_grid(plotlist=dotplot(ranef(m5)))
+
+getCall(m5)
+
+## random-slopes model
+m6 <- glmer(formula = incidence ~ (year_c | county) + (1 | year_f) +
+          offset(log(lag(incidence) + 1)),
+          data = practicedf, family = binomial(link = "cloglog"))
+## probably overfitted
+
+practicedf$log_prev_inc <- log(lag(practicedf$incidence) + 1)
+
+newdf <- na.omit(practicedf)
+set.seed(101)
+newdf$incidence <- simulate(~ (year_c | county) + (1 | year_f) +
+                    offset(log_prev_inc),
+                    newdata = newdf,
+         family = binomial(link = "cloglog"),
+         newparams=list(beta=1,
+                        theta=c(1,1,1,1)))[[1]]
+
+m7 <- update(m6, data=newdf)
+plot_grid(plotlist=dotplot(ranef(m7)))
+
+pp <- profile(m7,signames=FALSE, parallel="multicore", ncpus=3)
+confint(pp)
+xyplot(pp)
+ppd <- as.data.frame(pp)
+ggplot(ppd,aes(.focal,.zeta^2))+ geom_point() +geom_line() +
+    facet_wrap(~.par,scale="free")
+
+as.data.frame(ranef(m7))
+
+## constructing lagged variables:
+## base-R: c(NA,incidence[1:(nrow(data)-1)])
+##  OR     c(NA,head(incidence,-1))
+##  OR     dplyr::lag(incidence)
+
+#model fails to converge which is clearly just a bad model
 #So I went back to the incidence ~ 1 + offset(log(incidence[y-1]))
 #but this doesnt work in glmer since its not a mixed model (right?)
 #I tried this with a glm and realized I had to change up the data a bit and realized I ended up with the same
@@ -24,5 +84,6 @@ m1 <- glmer(incidence ~ year_f + (1|county), family=binomial(link = "cloglog"), 
 #General uncertainties with what the data frame should look like and contain
 #But know what to do with it once I get that
 
-#Does looking into if incidence ~ (year|cave) make sense to do?
+## Does looking into if incidence ~ (year|cave) make sense to do?
+##   yes, if your data set is large enough to support it
 #How do I organize my data such that the only thing remaining is playing around with the model and not the data
