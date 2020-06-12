@@ -3,87 +3,55 @@ library(lme4)
 library(cowplot)
 library(lattice)
 library(ggplot2)
-#What I have tried
+library(brglm2)
+library(glmmLasso)
+#What I ended up settling for
 
-#Tried to change df such that it looks like binomial version of mixedmodel df
-#so it looks like this 
-
-
-practicedf <- (read_csv("data/mixedmodelpractice.csv")
-    %>% mutate_at("year_f", factor)
+realdf <- (read_csv("data/mixedmodeldf.csv")
 )
 
-#and it has no recovery stage (as per Adrian) 
-#I tried to fit this into first just a mixed model and got singularity which makes sense
-#Fit of incidence ~ year_f + (1|county), family=binomial, data=mixedmodeldf worked from last time
+realdf$previousyear <- lag(readldf$incidence)
 
-#Now if I tried the same line but with the binomial df it shouldnt work 
+#I decided to remove 2006 bc there was only 1 infection
+#I think I will remove 2018 because everyone is infected in 2018
 
-m1 <- glmer(incidence ~ year_f + (1|county),
-            family=binomial(link = "cloglog"), data=practicedf)
+realdf <- realdf[which(realdf$year > 2006), names(realdf) %in% 
+                   c("id","year","county","yc","incidence","previousyear")]
 
-tt <- with(practicedf, table(incidence,year_f))
+realdf$year <- factor(realdf$year) #I want to do this when I import
+#But then cant subset factors. 
 
-## make year a random effect instead
-m2 <- update(m1, . ~ . -year_f + (1|year_f))
-plot_grid(plotlist=dotplot(ranef(m2)))
 
-m3 <- glm(incidence ~ year_f,
-          family=binomial(link = "cloglog"), data=practicedf)
+m1 <- glmer(incidence ~ year + (1|county),
+            family=binomial(link = "cloglog"), data=realdf)
 
-## eliminate all-0 or all-1 years
-m4 <- update(m3, subset=year>2008 & year<2018)
+#Error PIRLS step halving failed to reduce deviance
+#Can't rescale data (which is what I would do to solve this)
+#So my second thought would be to add a control but not sure
+#if that makes sense here
+#What does clamping do?
+#And is this basically just a nudge to use TMB for this problem
 
-## add 1 to avoid zero-incidence (log() = -Inf) problems
-m5 <- update(m2, . ~ . + offset(log(lag(incidence)+1)))
-plot_grid(plotlist=dotplot(ranef(m5)))
+m2 <- glm(incidence ~ year, data = realdf, family = binomial(link = "cloglog"), method = "brglmFit")
+#I found that I have complete seperation via brglm2?
+#I think I'm suppose to use "detect_seperation"?
+#But don't really know what penalization to do
 
-getCall(m5)
+#I found glmmLasso and started reading it
+#Am I looking for packages to fix all my problems too much?
+#The penalization should be done only on the fixed effects?
+#What I want to do this week is compare a penalized model
+#with years as fixed effects or years as random effects
 
-## random-slopes model
-m6 <- glmer(formula = incidence ~ (year_c | county) + (1 | year_f) +
-          offset(log(lag(incidence) + 1)),
-          data = practicedf, family = binomial(link = "cloglog"))
-## probably overfitted
+m3 <- glm(incidence ~ offset(log(previousyear + 1)), data = realdf,
+            family = binomial(link = "cloglog"))
 
-practicedf$log_prev_inc <- log(lag(practicedf$incidence) + 1)
+m4 <- glmer(incidence ~ (1|year) + (1|county) + offset(log(previousyear + 1)),
+            data = realdf, family = binomial(link = "cloglog") )
+#Fails to converge
 
-newdf <- na.omit(practicedf)
-set.seed(101)
-newdf$incidence <- simulate(~ (year_c | county) + (1 | year_f) +
-                    offset(log_prev_inc),
-                    newdata = newdf,
-         family = binomial(link = "cloglog"),
-         newparams=list(beta=1,
-                        theta=c(1,1,1,1)))[[1]]
-
-m7 <- update(m6, data=newdf)
-plot_grid(plotlist=dotplot(ranef(m7)))
-
-pp <- profile(m7,signames=FALSE, parallel="multicore", ncpus=3)
-confint(pp)
-xyplot(pp)
-ppd <- as.data.frame(pp)
-ggplot(ppd,aes(.focal,.zeta^2))+ geom_point() +geom_line() +
-    facet_wrap(~.par,scale="free")
-
-as.data.frame(ranef(m7))
-
-## constructing lagged variables:
-## base-R: c(NA,incidence[1:(nrow(data)-1)])
-##  OR     c(NA,head(incidence,-1))
-##  OR     dplyr::lag(incidence)
-
-#model fails to converge which is clearly just a bad model
-#So I went back to the incidence ~ 1 + offset(log(incidence[y-1]))
-#but this doesnt work in glmer since its not a mixed model (right?)
-#I tried this with a glm and realized I had to change up the data a bit and realized I ended up with the same
-#glm as I did before
-#I didnt think of different connectivity matricies since I wanted to get the original version of this going
-#Tried to implement background infection term but I think I need to simply create a new vector for that?
-#General uncertainties with what the data frame should look like and contain
-#But know what to do with it once I get that
-
-## Does looking into if incidence ~ (year|cave) make sense to do?
-##   yes, if your data set is large enough to support it
-#How do I organize my data such that the only thing remaining is playing around with the model and not the data
+m5 <- glmer(incidence ~ year + (1|county) + offset(log(previousyear + 1)),
+            data = realdf, family = binomial(link = "cloglog") )
+#this is what I want my final model to be
+#Very large eigenvalues and it wants me to rescale (dont think is possible)
+#fails to converge hence my thought to use glmmLasso on year
