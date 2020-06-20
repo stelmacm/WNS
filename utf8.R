@@ -3,6 +3,7 @@ library(rstanarm)
 library(shinystan)
 
 county <- scan(file="data/encoding.csv",what=character(1),sep="\n")
+county <- readr::read_table(file="data/encoding.csv")[[1]]
 dd <- expand.grid(county=county,
                   year=factor(2000:2004),
                   rep=1:4)

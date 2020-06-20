@@ -12,7 +12,8 @@ library(rstanarm)
 library(MCMCglmm)
 #Where we finished last time
 
-realdf <- (read_csv("data/mixedmodeldf.csv")
+realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
+           %>% as_tibble()
            %>% filter(year>2006)
            %>% mutate(previousyear=lag(incidence))
            %>% select(id,year,county, yc, incidence, previousyear)
