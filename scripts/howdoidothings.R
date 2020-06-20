@@ -32,8 +32,18 @@ realdf <- (read_csv("data/mixedmodeldf.csv")
 formula <- incidence ~ (1|year) + (1|county) +
   offset(log(previousyear + 1))
 
+
 m1 <- glmmTMB(formula ,
-          family=binomial(link = "cloglog"), data=realdf)
+              family=binomial(link = "cloglog"), data=realdf)
+
+m2 <- stan_glmer(formula ,
+                 family=binomial(link = "cloglog"), data=realdf,
+                 cores=4)
+
+options(encoding = "native.enc")
+library(shinystan)
+## https://github.com/stan-dev/shinystan/issues/171
+launch_shinystan(m2)
 #Still not the nicest log likihood...
 
 #Had some success with just trying simulations but ultimately 
