@@ -61,7 +61,7 @@ glmnet(xvars, yvar, family = "binomial", alpha = 1, lambda = NULL)
 #gets stuck here
 cv.lasso <- cv.glmnet(xvars, yvar, alpha = 1, family = "binomial")
 #this is what it would be with the ridge part
-model <- glmnet(xvars, yvars, alpha = 1, family = "binomial",
+model <- glmnet(xvars, yvar, alpha = 1, family = "binomial",
                 lambda = cv.lasso$lambda.min)
 
 #glmmLasso encounters many problems with NA's and matrix formats?
@@ -79,7 +79,7 @@ options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
 formula <- incidence ~ (1|year) + (1|county) +
-  offset(log(previousyear + 1))
+    offset(log(previousyear + 1))
 
 m1 <- glmmTMB(formula ,
               family=binomial(link = "cloglog"), data=ijustwannaseesomething)
