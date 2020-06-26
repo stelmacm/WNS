@@ -1,7 +1,17 @@
+#This is the script where I will play around with glmmLasso
+#I will attempt other methods of penalized regression
+#In an attempt to avoid the bayesian world
+
+#Afterwards we wil play around with the bayesian 
+#programs like stan and shinystan
+#did not get to shiny stan
+
+#questions regarding CSE 
+#https://cse.mcmaster.ca/graduate-studies/program-requirements.html
+#https://cse.mcmaster.ca/images/CSE_Handbook_2018_19.pdf
+#contradict one another
 library(tidyverse)
 library(lme4)
-library(cowplot)
-library(lattice)
 library(ggplot2)
 library(brglm2)
 library(glmmLasso)
@@ -9,9 +19,9 @@ library(glmmTMB)
 library(brms)
 library(rstan)
 library(rstanarm)
-library(MCMCglmm)
-#Where we finished last time
-
+library(glmnet)
+library(caret)
+set.seed(101)
 realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
            %>% as_tibble()
            %>% filter(year>2006)
@@ -20,62 +30,64 @@ realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
            %>% mutate_at("year", factor)
 )
 
-#Look into random effects and shrinkage
-#I liked stan but had trouble with how long it took
-#Even ran it in parallel but many issues with running 
-#parallel on ios for stan in R 4.0
+#changed the NA to have a 0 
+ijustwannaseesomething <- realdf
+ijustwannaseesomething$previousyear[1] <- 0
+ijustwannaseesomething <- ijustwannaseesomething[,-c(1,4)]
 
-#Brm worked nicely but for some models broke on the 4th chain
-#breaks down bc it "breaks vectorization and slows down the sampling too much"?
-
-#Settled on having year as fixed effect with prev year.
-#Without prev year year as random effect isnt as nice
 formula <- incidence ~ (1|year) + (1|county) +
   offset(log(previousyear + 1))
 
+#glmmLasso does not take offsets and it occured to me that regularization
+#might not make sense to do if there is an offset
+#Lasso is better for large data sets right?
+#Ridge was tricky bc tibble to model.matrix was having trouble
+#Caret is great for stuff like this
+
+#This doesn't seem right bc no cloglog and I don't know that this
+#works the same for mixed models as it does for regular studd
+
+training.samples <- ijustwannaseesomething$incidence %>% 
+  createDataPartition(p = 0.8, list = FALSE)
+
+train.data  <- ijustwannaseesomething[training.samples, ]
+test.data <- ijustwannaseesomething[-training.samples, ]
+
+xvars <- model.matrix(incidence~., ijustwannaseesomething)[,-1]
+yvar <- ijustwannaseesomething$incidence
+
+glmnet(xvars, yvar, family = "binomial", alpha = 1, lambda = NULL)
+
+#gets stuck here
+cv.lasso <- cv.glmnet(xvars, yvar, alpha = 1, family = "binomial")
+#this is what it would be with the ridge part
+model <- glmnet(xvars, yvars, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+
+#glmmLasso encounters many problems with NA's and matrix formats?
+#went through source code and got stuck a few places
+l1 <- glmmLasso(fix = incidence ~ (log(previousyear+1)), rnd = NULL,
+                data = ijustwannaseesomething, lambda = 10, family = binomial(link = "cloglog"),
+                control = list(0))
+
+#stan worked for me 2 days and then ran into errors everytime after
+#Error in unserialize(node$con) : error reading from connection
+#Calls: <Anonymous> -> slaveLoop -> makeSOCKmaster
+#But this only happens after I add multiple cores?
+#I probably should have asked for help earlier and I apologize for not doing so
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+formula <- incidence ~ (1|year) + (1|county) +
+  offset(log(previousyear + 1))
 
 m1 <- glmmTMB(formula ,
-              family=binomial(link = "cloglog"), data=realdf)
+              family=binomial(link = "cloglog"), data=ijustwannaseesomething)
 
 m2 <- stan_glmer(formula ,
-                 family=binomial(link = "cloglog"), data=realdf,
-                 cores=4)
+                 family=binomial(link = "cloglog"), data=ijustwannaseesomething)
 
-options(encoding = "native.enc")
-library(shinystan)
-## https://github.com/stan-dev/shinystan/issues/171
+m3 <- stan_glmer(formula ,
+                       family=binomial(link = "cloglog"), data=realdf)
 launch_shinystan(m2)
-#Still not the nicest log likihood...
-
-#Had some success with just trying simulations but ultimately 
-#couldn't compare goodness of fit of models based on simulations alone
-
-sim <- simulate(formula[-2],  ## RHS only #<- nifty trick via BB notes
-                newdata= realdf,
-                newparams= list(beta=-3,  #most common output from optims
-                               theta=c(1,1)), 
-                family=binomial(link = "cloglog"))[[1]] #forget why the 1st element
-
-#Read more into bayesian packages
-#https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-017-0357-7
-#Read the above for what is meta analysis/PRISMA
-
-#MCMCglmm does zero inflated binom. Am tempted to look more into this
-#Don't know much about zero inflated binom models
-
-#Is there a difference between best linear unbiased predictors and 
-#posterior mean of random effects? I am not understanding many differnces in
-#readings I have found
-
-#TO DO(start of week):
-#1. Find appropriate Beta coefficient for simulation (from optimizer)
-#2. Figure out difference between brms and stan and such
-#3. Is TMB the solution to the slow calculation
-#4. Attempt better shrinkage?? (seems fine)
-#5. Go more bayesian (but what does that entail...)
-
-#TO DO(post meeting):
-#1. Go more bayesian and attempt meta analysis?
-#2. "play around with priors" (what does that entail)?
-#3. Think about shared users as part of the priors???
-
+launch_shinystan(m3)
