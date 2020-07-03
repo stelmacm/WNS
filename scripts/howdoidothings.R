@@ -1,26 +1,53 @@
-#This is the script where I will play around with glmmLasso
-#I will attempt other methods of penalized regression
-#In an attempt to avoid the bayesian world
+#My notes on exploration of shiny stan
+#Read Gelman and Hill 2007 a tad
+#Started reading Gelman and Carlin 
+#Alot of things that I already have look nice naturally
 
-#Afterwards we wil play around with the bayesian 
-#programs like stan and shinystan
-#did not get to shiny stan
+#Main Questions:
+#1. Priors on covariates? (very vague question) How to basically approach them?
+#2. Regularization of priors? When is it appropriate and when is it too much? (also vague)
+#3. Scaling priors. Wide scaling is bad because it goes to the middle? 
+#4. Where should my threshold be for effective number of draws?
+#5. Should I worry about prior intercept everytime I change prior?
 
-#questions regarding CSE 
-#https://cse.mcmaster.ca/graduate-studies/program-requirements.html
-#https://cse.mcmaster.ca/images/CSE_Handbook_2018_19.pdf
-#contradict one another
+
+#Problems:
+#1.
+#Initially all the Rhat's look lovely and all
+#A pretty normal distribution of n_eff except there are
+#a few that are 500ish and others that are 7000 which seems
+#like a large range to me.
+#Tried tightening up the priors and prior_intercepts via scale 
+#to solve this
+#It made the range smaller but gave much higher Rhats
+
+#2.
+#My next attempt which I realize now was wrong was to try to make a 
+#gamm using mgcv and also gamm4
+#https://stat.ethz.ch/pipermail/r-sig-ecology/2011-May/002148.html
+#You discuss here how I'm pushing my data too hard and GAMM might be overfitting
+
+#3.
+#Is it crazy to penalize my priors? 
+#What is horse shoe prior? (probably wont use it but didn't realy understand it)
+#Is it just shrinkage/fake penalization? 
+#My next goal is to work with priors of covariates
+#My next thought process is to try laplace or student t for priors
+
+#Just incase 
 library(tidyverse)
 library(lme4)
 library(ggplot2)
 library(brglm2)
 library(glmmLasso)
 library(glmmTMB)
-library(brms)
+library(brms) 
 library(rstan)
 library(rstanarm)
 library(glmnet)
 library(caret)
+library(mgcv)
+library(gamm4)
 set.seed(101)
 realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
            %>% as_tibble()
@@ -30,64 +57,15 @@ realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
            %>% mutate_at("year", factor)
 )
 
-#changed the NA to have a 0 
-ijustwannaseesomething <- realdf
-ijustwannaseesomething$previousyear[1] <- 0
-ijustwannaseesomething <- ijustwannaseesomething[,-c(1,4)]
-
-formula <- incidence ~ (1|year) + (1|county) +
-  offset(log(previousyear + 1))
-
-#glmmLasso does not take offsets and it occured to me that regularization
-#might not make sense to do if there is an offset
-#Lasso is better for large data sets right?
-#Ridge was tricky bc tibble to model.matrix was having trouble
-#Caret is great for stuff like this
-
-#This doesn't seem right bc no cloglog and I don't know that this
-#works the same for mixed models as it does for regular studd
-
-training.samples <- ijustwannaseesomething$incidence %>% 
-  createDataPartition(p = 0.8, list = FALSE)
-
-train.data  <- ijustwannaseesomething[training.samples, ]
-test.data <- ijustwannaseesomething[-training.samples, ]
-
-xvars <- model.matrix(incidence~., ijustwannaseesomething)[,-1]
-yvar <- ijustwannaseesomething$incidence
-
-glmnet(xvars, yvar, family = "binomial", alpha = 1, lambda = NULL)
-
-#gets stuck here
-cv.lasso <- cv.glmnet(xvars, yvar, alpha = 1, family = "binomial")
-#this is what it would be with the ridge part
-model <- glmnet(xvars, yvar, alpha = 1, family = "binomial",
-                lambda = cv.lasso$lambda.min)
-
-#glmmLasso encounters many problems with NA's and matrix formats?
-#went through source code and got stuck a few places
-l1 <- glmmLasso(fix = incidence ~ (log(previousyear+1)), rnd = NULL,
-                data = ijustwannaseesomething, lambda = 10, family = binomial(link = "cloglog"),
-                control = list(0))
-
-#stan worked for me 2 days and then ran into errors everytime after
-#Error in unserialize(node$con) : error reading from connection
-#Calls: <Anonymous> -> slaveLoop -> makeSOCKmaster
-#But this only happens after I add multiple cores?
-#I probably should have asked for help earlier and I apologize for not doing so
+#Remeber to uncomment for BB
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
 formula <- incidence ~ (1|year) + (1|county) +
-    offset(log(previousyear + 1))
+  offset(log(previousyear + 1))
 
-m1 <- glmmTMB(formula ,
-              family=binomial(link = "cloglog"), data=ijustwannaseesomething)
+scaled2nopriorint <- stan_glmer(formula ,
+                 family=binomial(link = "cloglog"), data=realdf,
+                 prior = normal(location = 0, scale = 2, autoscale = TRUE))
 
-m2 <- stan_glmer(formula ,
-                 family=binomial(link = "cloglog"), data=ijustwannaseesomething)
-
-m3 <- stan_glmer(formula ,
-                       family=binomial(link = "cloglog"), data=realdf)
-launch_shinystan(m2)
-launch_shinystan(m3)
+launch_shinystan(scaled2nopriorint)
