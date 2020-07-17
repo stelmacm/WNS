@@ -1,71 +1,31 @@
-#My notes on exploration of shiny stan
-#Read Gelman and Hill 2007 a tad
-#Started reading Gelman and Carlin 
-#Alot of things that I already have look nice naturally
+#Stan model looks nice
+#If I run 10 chains and I thin by 10 I get warning that there 
+#is essentially too thin
+#So I have thin at 5 and I get very nice results but is that cheating?
 
-#Main Questions:
-#1. Priors on covariates? (very vague question) How to basically approach them?
-#2. Regularization of priors? When is it appropriate and when is it too much? (also vague)
-#3. Scaling priors. Wide scaling is bad because it goes to the middle? 
-#4. Where should my threshold be for effective number of draws?
-#5. Should I worry about prior intercept everytime I change prior?
+#https://bragqut.files.wordpress.com/2015/05/on-thinning-of-chains-in-mcmc.pdf
+#^article kinda going into thinning and why I might be cheating
 
+#How do I test the "enforcement of priors", I made up random data and just tested it
+#and that seemed to work fine but I'm not sure if that is sufficient
 
-#Problems:
-#1.
-#Initially all the Rhat's look lovely and all
-#A pretty normal distribution of n_eff except there are
-#a few that are 500ish and others that are 7000 which seems
-#like a large range to me.
-#Tried tightening up the priors and prior_intercepts via scale 
-#to solve this
-#It made the range smaller but gave much higher Rhats
+#I am happy with priors = normal(... autoscale = TRUE) bc it makes things look nice
+#If TRUE then the scales of the priors on the intercept and regression coefficients may 
+#be additionally modified internally by rstanarm in the following cases. 
+#First, for Gaussian models only, the prior scales for the intercept, coefficients, 
+#and the auxiliary parameter sigma (error standard deviation) are multiplied by sd(y). 
 
-#2.
-#My next attempt which I realize now was wrong was to try to make a 
-#gamm using mgcv and also gamm4
-#https://stat.ethz.ch/pipermail/r-sig-ecology/2011-May/002148.html
-#You discuss here how I'm pushing my data too hard and GAMM might be overfitting
+#I put year as a fixed variable and played around with that but the beta values of each year 
+#increase as the year progresses ie. 2007 has a value of 3 but 2011 is 9 and 2017 
+#has a value of 18
+#Not a problem but having year as a random effect isnt the prettiest but I playing around with 
+#priors doesnt change much. 
 
-#3.
-#Is it crazy to penalize my priors? 
-#What is horse shoe prior? (probably wont use it but didn't realy understand it)
-#Is it just shrinkage/fake penalization? 
-#My next goal is to work with priors of covariates
-#My next thought process is to try laplace or student t for priors
+#prior auxiliary. I feel like it's cheating changing my dispersion. Wouldn't you always want
+#to decrease you dispersion? I played with both and creating lower reciprocal dispersion value
+#and greater dispersion happened (as anticipated), but there was not a big difference in the
+#errors for each significant change
+#I kept prior aux as exponential but dont know if I should change that?
 
-#Just incase 
-library(tidyverse)
-library(lme4)
-library(ggplot2)
-library(brglm2)
-library(glmmLasso)
-library(glmmTMB)
-library(brms) 
-library(rstan)
-library(rstanarm)
-library(glmnet)
-library(caret)
-library(mgcv)
-library(gamm4)
-set.seed(101)
-realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
-           %>% as_tibble()
-           %>% filter(year>2006)
-           %>% mutate(previousyear=lag(incidence))
-           %>% select(id,year,county, yc, incidence, previousyear)
-           %>% mutate_at("year", factor)
-)
-
-#Remeber to uncomment for BB
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE)
-
-formula <- incidence ~ (1|year) + (1|county) +
-  offset(log(previousyear + 1))
-
-scaled2nopriorint <- stan_glmer(formula ,
-                 family=binomial(link = "cloglog"), data=realdf,
-                 prior = normal(location = 0, scale = 2, autoscale = TRUE))
-
-launch_shinystan(scaled2nopriorint)
+#What are implications of monte carlo uncertainty? Should I not be worried and it will work itself out 
+#with my priors? 
