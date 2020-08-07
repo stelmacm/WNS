@@ -9,6 +9,7 @@ library(esri2sf)
 library(tidyverse)
 library(rgdal)
 library(rgdal)
+library(lubridate)
 
 source("scripts/wns-presence.R")
 
@@ -80,14 +81,14 @@ rownames(touching.m)<-colnames(touching.m)<-uniq.df$county
 touching.m2 <- reshape2::melt(touching.m)[reshape2::melt(upper.tri(touching.m))$value,]
 names(touching.m2) <- c("county","county2","touching")
 
-#merge gc weights with adjacency score: 1 = touching, 0 = not touching
+#merge weights with adjacency score: 1 = touching, 0 = not touching
 both.weights<-left_join(all.shared.users,touching.m2,by=c("county","county2"))
 both.weights$touching<-if_else(is.na(both.weights$touching),0,1)
 #Model with just touching neighbors
 model <- glm(as.factor(incidence) ~ as.factor(touching) ,data = both.weights, family = binomial(link = "cloglog"))
 summary(model)
 
-#This wrong I think. I think this is still global
+#This wrong I think. I think this is still global. 
 
 site_visits <- presence.scrape %>%
   filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
@@ -102,4 +103,20 @@ n_local_neighbors <- lengths(st_is_within_distance(site_visits, dist = 100000))
 #https://spatialanalysis.github.io/lab_tutorials/Distance_Based_Spatial_Weights.html
 
 
+num<-sp::over(site_visits.p, as_Spatial(presence.df$geoms),fn=NULL)
 
+# pull out a unique list of county polys
+uniq.df<-presence.df[na.omit(unique(num)),]
+
+# convert coords from county poly to centroid points for each county. Then reproject.
+united.xy <- uniq.df$geoms %>% st_centroid() %>% 
+  st_transform(., "+proj=longlat +datum=WGS84")
+
+# construct neighbour list from county centroids
+county.n <- poly2nb(as_Spatial(presence.df$geoms))
+
+# spatial weights of neighbourlist
+county.w <- nb2listw(county.n,zero.policy = TRUE)
+
+#And then what I want to do is have the knn2nb as a more restricted form of a distance band neighbor
+#I'm not sure from there to make the data frame nice and cohesive for the glm 
