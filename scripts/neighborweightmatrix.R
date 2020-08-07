@@ -5,12 +5,13 @@
 library(sp)
 library(spdep)
 library(sf)
+## remotes::install_github("yonghah/esri2sf")
 library(esri2sf)
 library(tidyverse)
 library(rgdal)
-library(rgdal)
 library(lubridate)
 
+## packrat, pacman, renv, checkpoint
 source("scripts/wns-presence.R")
 
 presence.scrape <- read.csv("data/relevant-records.csv")

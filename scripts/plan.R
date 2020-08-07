@@ -3,18 +3,20 @@ library(drake)
 plan <- drake_plan(
 
   ### Start with raw list
-  # Read in GC list
-  gc_dat = read.csv("data/gc-list-unfiltered.csv",header=T,row.names = NULL,fill = T,sep = ",",na.strings = "",quote = "",comment.char = ""),
+  ## Read in GC list
+    gc_dat = { read.csv(file_in("data/gc-list-unfiltered.csv"))
+        ## consider 'pins' package
+        ## generate url for scraping
+        gc_dat$url <- paste("https://www.geocaching.com/geocache/",gc_dat$GC,"_",gsub(" ","-",tolower(gsub("[^[:alnum:] ]", "", gc_dat$title))),sep="")
+        gc_dat ## return the whole object
+    },
   
-  # generate url for scraping
-  gc_dat$url<-paste("https://www.geocaching.com/geocache/",gc_dat$GC,"_",gsub(" ","-",tolower(gsub("[^[:alnum:] ]", "", gc_dat$title))),sep=""),
-  
-  # Take a sample of the description sections from GC pages
-  # source("scripts/sample_descriptions.R"),
-  # sampled = sample.description(gc_dat),
+    ## Take a sample of the description sections from GC pages
+    ## source("scripts/sample_descriptions.R"),
+    ## sampled = sample.description(gc_dat),
   
   # clean the list of GC sites based on sampling keywords from descriptions
-  source("scripts/filter_descriptions.R"),
+  thing = source(file_in("scripts/filter_descriptions.R")),
   filtered = filter.description(gc_dat),
   gc_filtered_dat = na.omit(read.csv("data/gc-list-filtered.csv",header=T)),
   
@@ -84,4 +86,5 @@ plan <- drake_plan(
   )
 
 good_config <- drake_config(plan)
-vis_drake_graph(good_config, targets_only = TRUE,file = "figures/drake-plan.png",navigationButtons = F)
+vis_drake_graph(good_config)
+## vis_drake_graph(good_config, targets_only = TRUE,file = "figures/drake-plan.png",navigationButtons = FALSE)
