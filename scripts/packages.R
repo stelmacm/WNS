@@ -1,3 +1,4 @@
+## FIXME:: trim package list to those actually required!
 library(tidyverse)
 library(sf)
 library(ggplot2)
@@ -30,4 +31,4 @@ library(sp)
 library(spdep)
 library(tidyr)
 library(UpSetR)
-library(vcfR)
+## library(vcfR)

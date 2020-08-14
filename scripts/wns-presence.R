@@ -1,3 +1,5 @@
+require(esri2sf)
+
 ##### WNS Presence shape file
   url2 <- "https://www.sciencebase.gov/arcgis/rest/services/Catalog/59d45504e4b05fe04cc3d3e0/MapServer/2"
   df2 <- as.data.frame(esri2sf(url2))

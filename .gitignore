@@ -5,3 +5,6 @@
 *.Rout
 .RData
 .Rhistory
+.drake
+*/#*
+*/.*

@@ -1,4 +1,4 @@
-filter.description<-function(dat){
+filter.description<-function(dat, outfile){
   
   rD <- rsDriver(port = 4445L, browser = 'firefox')
   remDr <- rD$client
@@ -58,7 +58,9 @@ filter.description<-function(dat){
     pivot_wider(names_from = keyword,values_from = presence,id_cols = url,values_fn = list(presence = min)) %>% 
     # mutate_all(as.integer()) %>%
     as.data.frame()
-  
+
+  ## FIXME: stop here and return wide_full_set ?
+    
   png("figures/keyword_combinations.png",res = 300,height = 800,width = 1000,units = "px")
   UpSetR::upset(wide_full_set,nintersects = NA,nsets = length(keywords),order.by = "freq")
   dev.off()
@@ -70,5 +72,13 @@ filtered_set<-subset(wide_full_set,  wide_full_set$flashlight > 0 & wide_full_se
 
 filtered_dat<-na.omit(dat[match(filtered_set$url,dat$url),])
 
-write.csv(filtered_dat,"data/gc-list-filtered.csv")
+    ## maybe?
+    ##  wide_full_set
+    ##  %>% filter(flashlight >0,
+    ##             dave>0, ore>0, mine>0, mineral>0, mine >0)
+    ##  %>% right_join(select(dat,url),by="url")  ## ??? 
+    ##  %>% drop_na()
+    
+
+write.csv(filtered_dat,outfile)
 }
