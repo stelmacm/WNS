@@ -121,3 +121,7 @@ county.w <- nb2listw(county.n,zero.policy = TRUE)
 
 #And then what I want to do is have the knn2nb as a more restricted form of a distance band neighbor
 #I'm not sure from there to make the data frame nice and cohesive for the glm 
+
+#I would like to use centroid coords to create knn and make a distance band based on threshold distance rather than actual 
+#distance metrics (because theyre different??) distance band neighborhood
+#matrix based on that 
