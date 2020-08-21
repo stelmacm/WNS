@@ -8,7 +8,7 @@ planthreepointzero <- drake_plan(
         mutate_at("title", clean_url) %>%
         mutate(url=sprintf("https://www.geocaching.com/geocache/%s_%s",GC,title)),
     wns_presence = get_wns_presence(),
-    filter_descriptions=filter.description(gc_dat, file_out("data/gc-list-filtered.csv")),
+    ## filter_descriptions=filter.description(gc_dat, file_out("data/gc-list-filtered.csv")),
     gc_filtered_dat = na.omit(read.csv("data/gc-list-filtered.csv")),
     #https://stackoverflow.com/questions/43991498/rselenium-server-signals-port-is-already-in-use
     #Close port after scrape
@@ -35,7 +35,9 @@ planthreepointzero <- drake_plan(
     #geocache_loc = geocache_locs(all_results_merge),
     
     #This seems legit but says outdated and not passing the same things
-    relevant.records = relevant_records(scraped,all_results_merged$geocache.locs, presence.df, all_results_merged$all_results_merge, presence.poly, file_out("data/relevant-records.csv")),
+    relevant.records = relevant_records(scraped,all_results_merged$geocache.locs, wns_presence$df,
+                                        all_results_merged$all_results_merge, wns_presence$poly,
+                                        file_out("data/relevant-records.csv")),
     # Find overlaps between GC sites and WNS infected counties
     
     #source("scripts/geocache_mapping.R") #Just making pretty pictures :) :)
@@ -43,14 +45,16 @@ planthreepointzero <- drake_plan(
     
     #Shapes!!!
     #Shapes were moved into functions
-    #Stich both countries together to create one polygon and fix names
-    county_fix = county.fix(presence.df,presence.poly), #Unsure about this since it has 2 arguements 
-                                                       #and the function takes 4. also coming from get_wns
+    ##Stitch both countries together to create one polygon and fix names
+    ##USA Counties shape file
+    usa.shape = maps::map("county", regions = unique(counties[counties$Country == "USA", ]$state.province), fill = TRUE),
 
-    county.matrix = spatial.weight.matrix(relevant.records.data)    
+    county_fix = county.fix(wns_presence$df,wns_presence$poly, can.shape, usa.shape),
+
+    county.matrix = spatial.weight.matrix(relevant.records, wns_presence$df)    
     
 )
 
-good_config <- drake_config(planthreepointzero)
-vis_drake_graph(good_config)
-make(planthreepointzero)
+## good_config <- drake_config(planthreepointzero)
+## vis_drake_graph(good_config)
+## make(planthreepointzero)

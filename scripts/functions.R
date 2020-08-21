@@ -32,7 +32,7 @@ clean_url <- function(x) {
 all.results.merge <- function(scrapedresults, gc_filtered_dat) {
     all_results_merge <- scrapedresults %>%
         filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
-        left_join(select(gc_filtered_dat,-X.1,-X,-lon,-lat)) %>%
+        left_join(dplyr::select(gc_filtered_dat,-X.1,-X,-lon,-lat)) %>%
         mutate(county = paste0(trimws(gsub(pattern = "County.*$",replacement = "",county)),"-",province.state),
                Year = lubridate::year(lubridate::ymd(Date)))
      #??
@@ -56,7 +56,7 @@ relevant_records <- function(scraped, geocache.locs, presence.df, all_results_me
     geocache.coords <- as_Spatial(st_as_sf(geocache.locs, coords = c("lat","lon"), crs = 4326, agr = "constant"))
     
     # create an index of matching polygons from presence data
-    index.df <- as.data.frame(sp::over(geocache.coords, presence.poly, returnList = F))
+    index.df <- as.data.frame(sp::over(geocache.coords, presence.poly, returnList = FALSE))
     
     # bind results with coordinates of geocache sites (they are in the same order as the oringal index)
     geocache.presence.df <- left_join(presence.df,all_results_merge,by=c("STATEPROV"="province.state","county"="county","year"="Year"))
@@ -76,10 +76,11 @@ relevant_records <- function(scraped, geocache.locs, presence.df, all_results_me
                r.suspect = lubridate::ymd(gsub("-.+", "/01/01", YR_SUSPECT)),
                yr.confirm = lubridate::ymd(gsub("-.+", "/01/01", YR_CONFIRM)))
     
-    # we don't was to discard visits that would have preceeded introdution of infections!
-    # filter out geocache logs that were not made before WNS was "suspected"
-    write.csv(select(presence.scrape,-"geoms"),outfile)
-    
+    ## we don't was to discard visits that would have preceeded introdution of infections!
+    ## filter out geocache logs that were not made before WNS was "suspected"
+    ret <- dplyr::select(presence.scrape,-geoms)
+    write.csv(ret,outfile)
+    return(ret)
 }
 
 #Placed the shapes for county fix into functions instead of plan
@@ -92,12 +93,9 @@ counties = read.csv("data/all-counties.csv") %>%
 #file_in seems awkward infront of a shape file 
 can.shape = readOGR("shape/lcd_000b16a_e/lcd_000b16a_e.shp") #embarassing I cant push this
 
-#USA Counties shape file
-#This isnt even from a file :/
-usa.shape = maps::map("county", regions = unique(counties[counties$Country == "USA", ]$state.province), fill = T)
 #County fix function
 #Takes in can.shape, usa.shape, presence.df, presence.poly
-county.fix <- function(presence.df, presence.poly, can.shape = can.shape, usa.shape = usa.shape){
+county.fix <- function(presence.df, presence.poly, can.shape, usa.shape){
     
     rownames(presence.df) <- names(presence.poly)
     poly.df <- SpatialPolygonsDataFrame(presence.poly, presence.df)
@@ -132,17 +130,16 @@ county.fix <- function(presence.df, presence.poly, can.shape = can.shape, usa.sh
 relevant.records.data <- read.csv("data/relevant-records.csv")
 
 #Creating a spatial weight matrix
-#Takes relevant records as arguement. returns weight matrix
-spatial.weight.matrix <- function(relevant.records) {
-    
-    
+#Takes relevant records as argument. returns weight matrix
+spatial.weight.matrix <- function(relevant.records, presence.df) {
+
     site_visits <- relevant.records %>%
-        filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
-        group_by(county,Year,coords.x1,coords.x2) %>%
+        dplyr::filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
+        group_by(county,year,lon,lat) %>%
         summarise(total = length(User))
     
     site_visits.p <- as_Spatial(st_as_sf(site_visits,
-                                         coords = c("coords.x1","coords.x2"), 
+                                         coords = c("lon","lat"), 
                                          crs = 4326, agr = "constant"))
     
     # at the spatial locations of object x retrieves the indexes or attributes from spatial object y
