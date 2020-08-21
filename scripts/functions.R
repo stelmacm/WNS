@@ -29,8 +29,8 @@ clean_url <- function(x) {
 
 #These are from coordinate-overlap.R
 #Merge the results 
-all.results.merge <- function(scapedresults) {
-    all_results_merge <- scrapedscrapedresults %>%
+all.results.merge <- function(scrapedresults, gc_filtered_dat) {
+    all_results_merge <- scrapedresults %>%
         filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
         left_join(select(gc_filtered_dat,-X.1,-X,-lon,-lat)) %>%
         mutate(county = paste0(trimws(gsub(pattern = "County.*$",replacement = "",county)),"-",province.state),
