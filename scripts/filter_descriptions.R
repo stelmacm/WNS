@@ -58,27 +58,24 @@ filter.description<-function(dat, outfile){
     pivot_wider(names_from = keyword,values_from = presence,id_cols = url,values_fn = list(presence = min)) %>% 
     # mutate_all(as.integer()) %>%
     as.data.frame()
-
-  ## FIXME: stop here and return wide_full_set ?
-    
-  png("figures/keyword_combinations.png",res = 300,height = 800,width = 1000,units = "px")
-  UpSetR::upset(wide_full_set,nintersects = NA,nsets = length(keywords),order.by = "freq")
-  dev.off()
-
+  
 ##### Filtering
-filtered_set<-subset(wide_full_set,  wide_full_set$flashlight > 0 & wide_full_set$cave > 0 | 
-                       wide_full_set$ore > 0 & wide_full_set$mine > 0 | 
-                       wide_full_set$mineral > 0 & wide_full_set$mine > 0) 
+#filtered_set<-subset(wide_full_set,  wide_full_set$flashlight > 0 & wide_full_set$cave > 0 | 
+#                       wide_full_set$ore > 0 & wide_full_set$mine > 0 | 
+#                       wide_full_set$mineral > 0 & wide_full_set$mine > 0) 
 
-filtered_dat<-na.omit(dat[match(filtered_set$url,dat$url),])
 
-    ## maybe?
-    ##  wide_full_set
-    ##  %>% filter(flashlight >0,
-    ##             dave>0, ore>0, mine>0, mineral>0, mine >0)
-    ##  %>% right_join(select(dat,url),by="url")  ## ??? 
-    ##  %>% drop_na()
+#filtered_dat<-na.omit(dat[match(filtered_set$url,dat$url),])
     
+  filtered_dat <- wide_full_set %>%
+    filter(flashlight > 0 & cave > 0 | ore > 0 & mine > 0 | mineral > 0 & mine >0) %>%
+    right_join(select(dat,url),by="url") %>%
+    drop_na()
+  
+#Left photo just incase. I want to make one whole script of functions that make plots
+#png("figures/keyword_combinations.png",res = 300,height = 800,width = 1000,units = "px")
+#UpSetR::upset(wide_full_set,nintersects = NA,nsets = length(keywords),order.by = "freq")
+#dev.off()
 
 write.csv(filtered_dat,outfile)
 }
