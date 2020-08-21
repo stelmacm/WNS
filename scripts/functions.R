@@ -83,19 +83,9 @@ relevant_records <- function(scraped, geocache.locs, presence.df, all_results_me
     return(ret)
 }
 
-#Placed the shapes for county fix into functions instead of plan
-#Am I suppose to file in these?
-counties = read.csv("data/all-counties.csv") %>%
-    separate(1, c("county", "state.province", "Country"), sep = "\t") %>% 
-    distinct()
-
-#Canadian `Counties` shapefile
-#file_in seems awkward infront of a shape file 
-can.shape = readOGR("shape/lcd_000b16a_e/lcd_000b16a_e.shp") #embarassing I cant push this
-
 #County fix function
 #Takes in can.shape, usa.shape, presence.df, presence.poly
-county.fix <- function(presence.df, presence.poly, can.shape, usa.shape){
+county.fix <- function(presence.df, presence.poly, can.shape, usa.shape, counties) {
     
     rownames(presence.df) <- names(presence.poly)
     poly.df <- SpatialPolygonsDataFrame(presence.poly, presence.df)
@@ -126,8 +116,6 @@ county.fix <- function(presence.df, presence.poly, can.shape, usa.shape){
     united.poly <- rbind(can.shape.sf[, "id"], usa.shape.sf[, 2:1])
     return(united.poly = united.poly)
 }
-
-relevant.records.data <- read.csv("data/relevant-records.csv")
 
 #Creating a spatial weight matrix
 #Takes relevant records as argument. returns weight matrix

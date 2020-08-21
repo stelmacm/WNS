@@ -49,7 +49,17 @@ planthreepointzero <- drake_plan(
     ##USA Counties shape file
     usa.shape = maps::map("county", regions = unique(counties[counties$Country == "USA", ]$state.province), fill = TRUE),
 
-    county_fix = county.fix(wns_presence$df,wns_presence$poly, can.shape, usa.shape),
+    ##Placed the shapes for county fix into functions instead of plan
+    ##Am I suppose to file in these?
+    counties = read.csv(file_in("data/all-counties.csv")) %>%
+        separate(1, c("county", "state.province", "Country"), sep = "\t") %>% 
+        distinct(),
+
+    ##Canadian `Counties` shapefile
+    ##file_in seems awkward infront of a shape file 
+    can.shape = readOGR("shape/lcd_000b16a_e/lcd_000b16a_e.shp"),
+
+    county_fix = county.fix(wns_presence$df,wns_presence$poly, can.shape, usa.shape, counties),
 
     county.matrix = spatial.weight.matrix(relevant.records, wns_presence$df)    
     
