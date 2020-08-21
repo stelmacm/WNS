@@ -9,6 +9,7 @@ planthreepointzero <- drake_plan(
         mutate(url=sprintf("https://www.geocaching.com/geocache/%s_%s",GC,title)),
     wns_presence = get_wns_presence(),
     filter_descriptions=filter.description(gc_dat, file_out("data/gc-list-filtered.csv")),
+    gc_filtered_dat = na.omit(read.csv("data/gc-list-filtered.csv")),
     #https://stackoverflow.com/questions/43991498/rselenium-server-signals-port-is-already-in-use
     #Close port after scrape
     #Does the dependancy graph show a failure because I still have the port open?
@@ -30,11 +31,11 @@ planthreepointzero <- drake_plan(
     # source("scripts/user_lookup.R"),
     # rev_lookup = rev_lookup(scrape_dat),
     
-    all_results_merged = all.results.merge(scraped), #difference between df and call is *merged* vs *merge*
+    all_results_merged = all.results.merge(scraped, gc_filtered_dat), #difference between df and call is *merged* vs *merge*
     #geocache_loc = geocache_locs(all_results_merge),
     
     #This seems legit but says outdated and not passing the same things
-    relevant.records = relevant_records(scraped,geocache.locs, presence.df, all_results_merge, presence.poly, file_out("data/relevant-records.csv")),
+    relevant.records = relevant_records(scraped,all_results_merged$geocache.locs, presence.df, all_results_merged$all_results_merge, presence.poly, file_out("data/relevant-records.csv")),
     # Find overlaps between GC sites and WNS infected counties
     
     #source("scripts/geocache_mapping.R") #Just making pretty pictures :) :)
