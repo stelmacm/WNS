@@ -1,31 +1,45 @@
-#Stan model looks nice
-#If I run 10 chains and I thin by 10 I get warning that there 
-#is essentially too thin
-#So I have thin at 5 and I get very nice results but is that cheating?
+#Playing around with spatial weight matrix
+#library(conflicted)
+#simplified version to run
+#import only necessary packages
+library(sp)
+library(spdep)
+library(sf)
+## remotes::install_github("yonghah/esri2sf")
+library(esri2sf)
+library(tidyverse)
+library(rgdal)
+library(lubridate)
+library(Matrix)
+require(spatialreg)
+## packrat, pacman, renv, checkpoint
+source("scripts/wns-presence.R")
 
-#https://bragqut.files.wordpress.com/2015/05/on-thinning-of-chains-in-mcmc.pdf
-#^article kinda going into thinning and why I might be cheating
+presence.scrape <- read.csv("data/relevant-records.csv")
 
-#How do I test the "enforcement of priors", I made up random data and just tested it
-#and that seemed to work fine but I'm not sure if that is sufficient
+#Remove Cali and Wash for now
+uniq.df<-presence.df %>% dplyr::filter(.,STATEPROV != c("California","Washington"))
+uniq.df<-uniq.df[!duplicated(uniq.df$county),] #so we only have unique counties
 
-#I am happy with priors = normal(... autoscale = TRUE) bc it makes things look nice
-#If TRUE then the scales of the priors on the intercept and regression coefficients may 
-#be additionally modified internally by rstanarm in the following cases. 
-#First, for Gaussian models only, the prior scales for the intercept, coefficients, 
-#and the auxiliary parameter sigma (error standard deviation) are multiplied by sd(y). 
+wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
+wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
-#I put year as a fixed variable and played around with that but the beta values of each year 
-#increase as the year progresses ie. 2007 has a value of 3 but 2011 is 9 and 2017 
-#has a value of 18
-#Not a problem but having year as a random effect isnt the prettiest but I playing around with 
-#priors doesnt change much. 
+wns.center.coords <- cbind(wnslat, wnslon)
 
-#prior auxiliary. I feel like it's cheating changing my dispersion. Wouldn't you always want
-#to decrease you dispersion? I played with both and creating lower reciprocal dispersion value
-#and greater dispersion happened (as anticipated), but there was not a big difference in the
-#errors for each significant change
-#I kept prior aux as exponential but dont know if I should change that?
+knn.poly <- knn2nb(knearneigh(wns.center.coords, k = 1, longlat = NULL)) #doubles?
 
-#What are implications of monte carlo uncertainty? Should I not be worried and it will work itself out 
-#with my priors? 
+wns.threshold.poly <- max(unlist(nbdists(knn.poly, wns.center.coords, longlat = TRUE)))
+
+#distance band approach
+neighbor.distance.band.poly <- dnearneigh(wns.center.coords, 0, wns.threshold.poly,
+                                          longlat = TRUE)
+
+localcounty <- nb2listw(neighbor.distance.band.poly, style = "W") 
+#Style W I think?
+#Vignette does style B but I think they are achieving something else
+#https://cran.r-project.org/web/packages/spdep/vignettes/nb_igraph.html
+
+localcounty.matrix <- as(localcounty, "CsparseMatrix")
+#Tried this method, st_ using sf, unsure what is incorrect about the approach 
+
+
