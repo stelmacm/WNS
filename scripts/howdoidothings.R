@@ -11,7 +11,7 @@ library(tidyverse)
 library(rgdal)
 library(lubridate)
 library(Matrix)
-require(spatialreg)
+suppressMessages(suppressWarnings(require(spatialreg)))
 ## packrat, pacman, renv, checkpoint
 source("scripts/wns-presence.R")
 
@@ -25,6 +25,7 @@ wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
 wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
 wns.center.coords <- cbind(wnslat, wnslon)
+rownames(wns.center.coords) <- uniq.df$county
 
 knn.poly <- knn2nb(knearneigh(wns.center.coords, k = 1, longlat = NULL)) #doubles?
 
@@ -33,6 +34,7 @@ wns.threshold.poly <- max(unlist(nbdists(knn.poly, wns.center.coords, longlat = 
 #distance band approach
 neighbor.distance.band.poly <- dnearneigh(wns.center.coords, 0, wns.threshold.poly,
                                           longlat = TRUE)
+names(neighbor.distance.band.poly) <- uniq.df$county
 
 localcounty <- nb2listw(neighbor.distance.band.poly, style = "W") 
 #Style W I think?
@@ -40,6 +42,24 @@ localcounty <- nb2listw(neighbor.distance.band.poly, style = "W")
 #https://cran.r-project.org/web/packages/spdep/vignettes/nb_igraph.html
 
 localcounty.matrix <- as(localcounty, "CsparseMatrix")
-#Tried this method, st_ using sf, unsure what is incorrect about the approach 
+dimnames(localcounty.matrix) <- list(uniq.df$county,uniq.df$county)
+##Tried this method, st_ using sf, unsure what is incorrect about the approach
+
+M <- localcounty.matrix
+
+## rr <- 300:350
+rr <- seq(nrow(M)) ## whole matrix
+p <- Matrix::image(Matrix(M[rr,rr]), scales=list(x=list(at=seq(length(rr)),labels=rownames(M)[rr]),
+                                          y=list(at=seq(length(rr)),labels=colnames(M)[rr])),
+                   xlab="",ylab="",
+                   sub="")
+
+## pdf("tmp.pdf",width=60,height=60)
+## print(p)
+## dev.off()
+
+
+
+
 
 
