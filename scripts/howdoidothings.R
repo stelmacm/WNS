@@ -1,4 +1,4 @@
-#Playing around with spatial weight matrix
+#Creating an exponential decay spatial weight matrix
 #library(conflicted)
 #simplified version to run
 #import only necessary packages
@@ -8,11 +8,11 @@ library(sf)
 ## remotes::install_github("yonghah/esri2sf")
 library(esri2sf)
 library(tidyverse)
-library(rgdal)
 library(lubridate)
 library(Matrix)
+library(raster)
 suppressMessages(suppressWarnings(require(spatialreg)))
-## packrat, pacman, renv, checkpoint
+
 source("scripts/wns-presence.R")
 
 presence.scrape <- read.csv("data/relevant-records.csv")
@@ -25,41 +25,69 @@ wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
 wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
 wns.center.coords <- cbind(wnslat, wnslon)
-rownames(wns.center.coords) <- uniq.df$county
+#rownames(wns.center.coords) <- uniq.df$county
 
-knn.poly <- knn2nb(knearneigh(wns.center.coords, k = 1, longlat = NULL)) #doubles?
+dist.mat <- as.matrix(dist(wns.center.coords, method = "euclidean")) #d_{ij}
+#Now I want to perform transformation after x km (say 30 km)
 
-wns.threshold.poly <- max(unlist(nbdists(knn.poly, wns.center.coords, longlat = TRUE)))
+#Turn into exp decay 30 km around point
 
-#distance band approach
-neighbor.distance.band.poly <- dnearneigh(wns.center.coords, 0, wns.threshold.poly,
-                                          longlat = TRUE)
-names(neighbor.distance.band.poly) <- uniq.df$county
+exponentiate <- function(x) {
+  if(x > 30){
+    x*exp(-(x/100)) #I am trying to return a decayed distance rather than a probability
+  } #I got this number by seeing what numbers are returned when entered 
+  return(x)
+}
+#I think this might actually be promoting the farther points rather than decaying them
+decay.mat <- apply(dist.mat, c(1,2), exponentiate)
+#Now to weight matrix
+localcountymat.w <- mat2listw(decay.mat, style = "W")
+localcountymat.m <- as(localcountymat.w, "CsparseMatrix")
+dimnames(localcountymat.m) <- list(uniq.df$county,uniq.df$county)
 
-localcounty <- nb2listw(neighbor.distance.band.poly, style = "W") 
-#Style W I think?
-#Vignette does style B but I think they are achieving something else
-#https://cran.r-project.org/web/packages/spdep/vignettes/nb_igraph.html
+M <- localcountymat.m
 
-localcounty.matrix <- as(localcounty, "CsparseMatrix")
-dimnames(localcounty.matrix) <- list(uniq.df$county,uniq.df$county)
-##Tried this method, st_ using sf, unsure what is incorrect about the approach
-
-M <- localcounty.matrix
-
-## rr <- 300:350
 rr <- seq(nrow(M)) ## whole matrix
 p <- Matrix::image(Matrix(M[rr,rr]), scales=list(x=list(at=seq(length(rr)),labels=rownames(M)[rr]),
-                                          y=list(at=seq(length(rr)),labels=colnames(M)[rr])),
+                                                 y=list(at=seq(length(rr)),labels=colnames(M)[rr])),
+                   xlab="",ylab="",
+                   sub="")
+#This doesn't look like it is working like it is suppose to 
+
+#My second thought was exponential decay on all this distances rather than 
+#just distances from x km onwards being decayed (especially if its only for a weight matrix)
+#Is that too aggressive?
+
+decay.all <- exp(-dist.mat)
+decaycountymat.w <- mat2listw(decay.all, style = "W")
+decaycountymat.m <- as(decaycountymat.w, "CsparseMatrix")
+dimnames(decaycountymat.m) <- list(uniq.df$county,uniq.df$county)
+
+B <- localcountymat.m
+
+rr1 <- seq(nrow(B)) ## whole matrix
+q <- Matrix::image(Matrix(B[rr1,rr1]), scales=list(x=list(at=seq(length(rr1)),labels=rownames(B)[rr1]),
+                                                 y=list(at=seq(length(rr1)),labels=colnames(B)[rr1])),
                    xlab="",ylab="",
                    sub="")
 
-## pdf("tmp.pdf",width=60,height=60)
-## print(p)
-## dev.off()
+#Me playing with other things
+#Inverse matrix just for fun
+inv.dist.mat <- 1/dist.mat 
+#Turn it into weights
+dist.mat.inv <- mat2listw(inv.dist.mat, style = "W", row.names = uniq.df$county)
+#This was the most common approach 
 
 
+#The distance of 30 km
+dist30 <- dnearneigh(wns.center.coords, 0, 30, longlat = TRUE)
+
+#Adjecency matrix
+touching<-st_intersects(uniq.df$geoms,sparse = F)
+touching.m <- as.matrix(touching)
+rownames(touching.m)<-colnames(touching.m)<-uniq.df$county
 
 
-
-
+#ew
+plot(presence.poly, col = "gray", border = "black")
+plot(dist50, wns.center.coords, col = "red", add = TRUE)
