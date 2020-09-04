@@ -18,7 +18,7 @@ source("scripts/wns-presence.R")
 presence.scrape <- read.csv("data/relevant-records.csv")
 
 #Remove Cali and Wash for now
-uniq.df<-presence.df %>% dplyr::filter(.,STATEPROV != c("California","Washington"))
+uniq.df<-presence.df %>% dplyr::filter(! STATEPROV %in% c("California","Washington"))
 uniq.df<-uniq.df[!duplicated(uniq.df$county),] #so we only have unique counties
 
 wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
@@ -34,12 +34,51 @@ dist.mat <- as.matrix(dist(wns.center.coords, method = "euclidean")) #d_{ij}
 
 exponentiate <- function(x) {
   if(x > 30){
-    x*exp(-(x/100)) #I am trying to return a decayed distance rather than a probability
-  } #I got this number by seeing what numbers are returned when entered 
-  return(x)
+      exp(-(x/100)) #I am trying to return a decayed distance rather than a probability
+  } else {
+      exp(-30/100)
+  }
 }
+
+xfun2 <- function(x) {
+    exp(-pmax(x,30)/100)
+}
+
+library(rbenchmark)
+library(microbenchmark)
+x <- dist.mat
+benchmark(
+    replications=10,
+    x1=ifelse(x>30, exp(-x/100), exp(-30/100)),
+    x2=exp(-(ifelse(x>30, x, 30)/100)),
+    x3=exp(-pmax(x,30)/100),
+    x4=apply(x, 1:2, exponentiate)
+)
+
+m1 <- microbenchmark(
+    times=10,
+    x1=ifelse(x>30, exp(-x/100), exp(-30/100)),
+    x2=exp(-(ifelse(x>30, x, 30)/100)),
+    x3=exp(-pmax(x,30)/100),
+    x4=apply(x, 1:2, exponentiate)
+)
+autoplot(m1)
+
+
+## check that it's working
+x3 <- exp(-pmax(x,30)/100)
+x4 <- apply(x, 1:2, exponentiate)
+all.equal(x3,x4)
+
+curve(xfun2,from=0,to=200)
+
+hist(dist.mat)
+mean(dist.mat<30)  ## 97.5% of distances < 30 ??
+
 #I think this might actually be promoting the farther points rather than decaying them
-decay.mat <- apply(dist.mat, c(1,2), exponentiate)
+decay.mat <- xfun2(dist.mat)
+hist(decay.mat)
+
 #Now to weight matrix
 localcountymat.w <- mat2listw(decay.mat, style = "W")
 localcountymat.m <- as(localcountymat.w, "CsparseMatrix")
