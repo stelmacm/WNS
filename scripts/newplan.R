@@ -46,6 +46,11 @@ planthreepointzero <- drake_plan(
     #Shapes!!!
     #Shapes were moved into functions
     ##Stitch both countries together to create one polygon and fix names
+    
+    ##Canadian `Counties` shapefile
+    ##file_in seems awkward infront of a shape file 
+    can.shape = readOGR("shape/lcd_000b16a_e/lcd_000b16a_e.shp"),
+    
     ##USA Counties shape file
     usa.shape = maps::map("county", regions = unique(counties[counties$Country == "USA", ]$state.province), fill = TRUE),
 
@@ -55,16 +60,23 @@ planthreepointzero <- drake_plan(
         separate(1, c("county", "state.province", "Country"), sep = "\t") %>% 
         distinct(),
 
-    ##Canadian `Counties` shapefile
-    ##file_in seems awkward infront of a shape file 
-    can.shape = readOGR("shape/lcd_000b16a_e/lcd_000b16a_e.shp"),
+    
 
     county_fix = county.fix(wns_presence$df,wns_presence$poly, can.shape, usa.shape, counties),
 
-    county.matrix = spatial.weight.matrix(relevant.records, wns_presence$df)    
+    county.matrix = spatial.weight.matrix(relevant.records, wns_presence$df),
     
+    wns.centroid.coordinates = wns.centroid.coords(wns_presence$df),
+    
+    spatial.dist.matrix = dist.matrix(wns.centroid.coordinates$wns.center.coords),
+    
+    spatial.decay.matrix = decay.matrix(spatial.dist.matrix$d1),
+    
+    spatial.weight.decay.matrix = weighted.decay.matrix(spatial.decay.matrix$decay.mat)
 )
 
-## good_config <- drake_config(planthreepointzero)
-## vis_drake_graph(good_config)
-## make(planthreepointzero)
+ good_config <- drake_config(planthreepointzero)
+ vis_drake_graph(good_config)
+ make(planthreepointzero)
+
+ 
