@@ -162,3 +162,45 @@ spatial.weight.matrix <- function(relevant.records, presence.df) {
     
     return(county.m)
 }
+
+
+wns.centroid.coords <- function(presence.df) {
+    
+    #Remove Cali and Wash for now
+    uniq.df<-presence.df %>% dplyr::filter(.,STATEPROV != c("California","Washington"))
+    uniq.df<-uniq.df[!duplicated(uniq.df$county),] #so we only have unique counties
+    
+    wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
+    wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
+    
+    wns.center.coords <- cbind(wnslat, wnslon)
+    
+    return(wns.center.coords)
+}
+
+
+dist.matrix <- function(wns.center.coords) {
+    
+    d1<- distm(wns.center.coords, fun = distGeo) #Ellipsoid 
+    dimnames(d1) <- list(uniq.df$county,uniq.df$county)
+    d1 <- d1/1000 
+    
+    return(d1)
+}
+
+decay.matrix <- function(d1){
+    decay.mat <- exp(-pmax(d1,30))
+    
+    return(decay.mat)
+}
+
+weighted.decay.matrix <- function(decay.mat){
+    decay.mat[(decay.mat < 1e-300)] <- 0
+    diag(decay.mat) <- 0
+    #Now to weight matrix
+    localcountymat.w <- mat2listw(decay.mat, style = "W")
+    localcountymat.m <- as(localcountymat.w, "CsparseMatrix") #I hope this makes it sparse
+    #dimnames(localcountymat.m) <- list(uniq.df$county,uniq.df$county) #not drake appropriate yet
+    
+    return(localcountymat.m)
+}
