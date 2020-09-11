@@ -1,132 +1,67 @@
-#Creating an exponential decay spatial weight matrix
-#library(conflicted)
-#simplified version to run
-#import only necessary packages
-library(sp)
-library(spdep)
-library(sf)
-## remotes::install_github("yonghah/esri2sf")
-library(esri2sf)
 library(tidyverse)
-library(lubridate)
-library(Matrix)
-library(raster)
-suppressMessages(suppressWarnings(require(spatialreg)))
-
+#Testing different types of coord to km types
 source("scripts/wns-presence.R")
 
 presence.scrape <- read.csv("data/relevant-records.csv")
 
 #Remove Cali and Wash for now
-uniq.df<-presence.df %>% dplyr::filter(! STATEPROV %in% c("California","Washington"))
+uniq.df<-presence.df %>% dplyr::filter(.,STATEPROV != c("California","Washington"))
 uniq.df<-uniq.df[!duplicated(uniq.df$county),] #so we only have unique counties
 
 wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
 wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
 wns.center.coords <- cbind(wnslat, wnslon)
-#rownames(wns.center.coords) <- uniq.df$county
 
-dist.mat <- as.matrix(dist(wns.center.coords, method = "euclidean")) #d_{ij}
-#Now I want to perform transformation after x km (say 30 km)
+#method 2 (probably the one I will keep)
+library(geosphere)
+#Many cool functions to remember for later
+#distm is the fun but has different methods. DistGeo and distHaversine both seem reasonable
+#distGeo takes shortest dist between 2 points on an ellipoid (WGS84) (called geodesic distance)
+#I think distGeo is Vincenty (Vinsanity lol) and is more accurate
+#https://stackoverflow.com/questions/38248046/is-the-haversine-formula-or-the-vincentys-formula-better-for-calculating-distan
+#SEA LEVELS MATTER??? ugh ridinkidinkulous
+#option 1
+d1<- distm(wns.center.coords, fun = distGeo)
+dimnames(d1) <- list(uniq.df$county,uniq.df$county)
+view(d1)
+d2<- distm(wns.center.coords, fun = distHaversine)
+dimnames(d2) <- list(uniq.df$county,uniq.df$county)
+view(d2)
+identical(d1,d2) #False. mean relative difference is 0.00102. Probably fine
+#I am a CLOWN. I spent so much time double checking only to realize im double checking cities not counties
+#Which is why everything was wrong
 
-#Turn into exp decay 30 km around point
-
-exponentiate <- function(x) {
-  if(x > 30){
-      exp(-(x/100)) #I am trying to return a decayed distance rather than a probability
-  } else {
-      exp(-30/100)
-  }
-}
+#convert from m to km
+d1 <- d1/1000
+#Havent decided yet but both are *reasonable*
+#Is it cheating to simply pick which one has the nicer likelihood?
 
 xfun2 <- function(x) {
-    exp(-pmax(x,30)/100)
+  exp(-pmax(x,30))
 }
 
-library(rbenchmark)
-library(microbenchmark)
-x <- dist.mat
-benchmark(
-    replications=10,
-    x1=ifelse(x>30, exp(-x/100), exp(-30/100)),
-    x2=exp(-(ifelse(x>30, x, 30)/100)),
-    x3=exp(-pmax(x,30)/100),
-    x4=apply(x, 1:2, exponentiate)
-)
+decay.mat <- xfun2(d1)
+#Now set cut off
 
-m1 <- microbenchmark(
-    times=10,
-    x1=ifelse(x>30, exp(-x/100), exp(-30/100)),
-    x2=exp(-(ifelse(x>30, x, 30)/100)),
-    x3=exp(-pmax(x,30)/100),
-    x4=apply(x, 1:2, exponentiate)
-)
-autoplot(m1)
+decay.mat[(decay.mat < 1e-300)] <- 0 #Chose 300 but maybe I should do more?
+#Logic for choosing 300 was going through several the matrix and seeing that many
+#of the incredibly "small" points were in the 300's
+#Although there are some in the upper 200 there is not many and they are usually within state
+#which seemed reasonable
 
-
-## check that it's working
-x3 <- exp(-pmax(x,30)/100)
-x4 <- apply(x, 1:2, exponentiate)
-all.equal(x3,x4)
-
-curve(xfun2,from=0,to=200)
-
-hist(dist.mat)
-mean(dist.mat<30)  ## 97.5% of distances < 30 ??
-
-#I think this might actually be promoting the farther points rather than decaying them
-decay.mat <- xfun2(dist.mat)
-hist(decay.mat)
+diag(decay.mat) <- 0 #Cant see matrix for some reason 
 
 #Now to weight matrix
 localcountymat.w <- mat2listw(decay.mat, style = "W")
-localcountymat.m <- as(localcountymat.w, "CsparseMatrix")
+localcountymat.m <- as(localcountymat.w, "CsparseMatrix") #I hope this makes it sparse
 dimnames(localcountymat.m) <- list(uniq.df$county,uniq.df$county)
+#A *little* upset I can't file_out this in drake so everything can be up to date but its fine
+Matrix::image(localcountymat.m)
 
-M <- localcountymat.m
+#Now organize so we can have a glm format
+shareduser <- read.csv("data.gc-shared-users.csv")
+#A bit confused on how the left_join this together
 
-rr <- seq(nrow(M)) ## whole matrix
-p <- Matrix::image(Matrix(M[rr,rr]), scales=list(x=list(at=seq(length(rr)),labels=rownames(M)[rr]),
-                                                 y=list(at=seq(length(rr)),labels=colnames(M)[rr])),
-                   xlab="",ylab="",
-                   sub="")
-#This doesn't look like it is working like it is suppose to 
-
-#My second thought was exponential decay on all this distances rather than 
-#just distances from x km onwards being decayed (especially if its only for a weight matrix)
-#Is that too aggressive?
-
-decay.all <- exp(-dist.mat)
-decaycountymat.w <- mat2listw(decay.all, style = "W")
-decaycountymat.m <- as(decaycountymat.w, "CsparseMatrix")
-dimnames(decaycountymat.m) <- list(uniq.df$county,uniq.df$county)
-
-B <- localcountymat.m
-
-rr1 <- seq(nrow(B)) ## whole matrix
-q <- Matrix::image(Matrix(B[rr1,rr1]), scales=list(x=list(at=seq(length(rr1)),labels=rownames(B)[rr1]),
-                                                 y=list(at=seq(length(rr1)),labels=colnames(B)[rr1])),
-                   xlab="",ylab="",
-                   sub="")
-
-#Me playing with other things
-#Inverse matrix just for fun
-inv.dist.mat <- 1/dist.mat 
-#Turn it into weights
-dist.mat.inv <- mat2listw(inv.dist.mat, style = "W", row.names = uniq.df$county)
-#This was the most common approach 
-
-
-#The distance of 30 km
-dist30 <- dnearneigh(wns.center.coords, 0, 30, longlat = TRUE)
-
-#Adjecency matrix
-touching<-st_intersects(uniq.df$geoms,sparse = F)
-touching.m <- as.matrix(touching)
-rownames(touching.m)<-colnames(touching.m)<-uniq.df$county
-
-
-#ew
-plot(presence.poly, col = "gray", border = "black")
-plot(dist50, wns.center.coords, col = "red", add = TRUE)
+countyneighborincidence <- left_join(shareduser, localcountymat.m, by= c("county1","county2")) #This is wrong
+#Need to rename dim of localcountymat in order for this to go
