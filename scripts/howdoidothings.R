@@ -33,4 +33,34 @@ summary(glm1)
 #sampling from obsereved points in a continuous area
 #Doesn't help us in this problem but none the less found it curious.
 
+op <- par(mfrow=c(2,2))
+plot(glm1)
+par(op) ## restore graphics parameters
+
+library(DHARMa)
+ss <- simulateResiduals(glm1)
+plot(ss)
+plotResiduals(ss,na.omit(wnscounty$distancevalue))
+vignette("DHARMa")
+
+## summary of predictive accuracy?  (ROC)
+table(wnscounty$incidence)
+
+## what other information do we have that we can use in the model?
+## year
+## (receiving) county
+
+## function(distance) {
+##   calculate weight matrix, generate distancevalue
+##   fit the model (quick)
+##   return the log-likelihood
+## }
+##
+## sapply() / for loop / optimize()
+## log-spaced vector from 1/5  to 1/10000  (km?)
+##
+## double-check previous formula: what was 'previousyear' ?
+#
+## consider incidence ~ (1|year) + (1|county) + offset(log(distancevalue))
+##   or               ~ (1|year) + (1|county) + log(distancevalue)
 
