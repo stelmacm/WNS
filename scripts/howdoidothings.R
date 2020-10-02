@@ -1,6 +1,11 @@
 library(tidyverse)
 library(geosphere)
 library(conflicted)
+conflict_prefer("flatten", "purrr")
+conflict_prefer("filter", "dplyr")
+conflict_prefer("lag", "dplyr")
+conflict_prefer("select", "dplyr")
+
 ## function(distance) {
 ##   calculate weight matrix, generate distancevalue
 ##   fit the model (quick)
@@ -104,9 +109,10 @@ loglikfunction(d1,30,1e-75)
 
 #Back to the mixed model
 
+
 realdf <- (read.csv("data/mixedmodeldf.csv")  ## switch to read.csv (encodings)
            %>% as_tibble()
-           %>% filter(year>2006)
+           %>% dplyr::filter(year>2006)
            %>% mutate(previousyear=lag(incidence))
            %>% dplyr::select(id,year,county, yc, incidence, previousyear)
            %>% mutate_at("year", factor)
