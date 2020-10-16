@@ -1,5 +1,5 @@
 #Hey look at me clogging up the global enviroment with useless packages
-source("scripts/packages")
+source("scripts/packages.R")
 library(conflicted)
 conflict_prefer("flatten", "purrr")
 conflict_prefer("filter", "dplyr")
