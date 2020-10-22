@@ -1,7 +1,6 @@
 #Now we are creating the script that has all the glm as a function
 #The will run that function
 
-
 #First we start with everything we need outside the function
 source("scripts/packages.R") 
 source("scripts/wns-presence.R")
@@ -65,10 +64,10 @@ formula <- incidence ~ (1|year) + (1|county) +
 
 #Now here we will make it so the user input the distance and cut off of their choice.
 
-runthemodel <- function(distancecutoff, expcutoff){
+runthemodel <- function(distancecutoff, dscale, expcutoff){
   
   xfun2 <- function(x) {
-    exp(-pmax(x,distancecutoff))
+    exp(-pmax(x,distancecutoff)/dscale)
   }
   #Apply function
   decay.mat <- xfun2(d1)
@@ -132,16 +131,77 @@ runthemodel <- function(distancecutoff, expcutoff){
 #test<- runthemodel(100, 1e-150)
 
 cutoffvalues <- 10^(seq(-300, -100, by = 25))
-distcoefvec <- exp(seq(log(2), log(200), length.out=30)) #Actually really like the values
-llikvec <- rep(NA,length(distcoefvec))
+distcoefvec <- exp(seq(log(2), log(200), length.out=11)) #Actually really like the values
+## distscale <- distcoefvec
+## parframe <- expand.grid(distcoefvec, distscale)
+parframe <- data.frame(distcoefvec)
 
-#I guess my brain kinda broke on what else to do with this for loop
-for(i in seq_along(distcoefvec)){
-  result <- runthemodel(i, 1e-150)
-  llikvec[i] <- logLik(result)
-  #I have no clue how to get coeffs
+llikvec <- rep(NA,nrow(parframe))
+
+system.time(r0 <- runthemodel(parframe$distcoefvec[1], 1e-150))
+library(DHARMa)
+library(broom.mixed)
+plot(s0 <- simulateResiduals(r0))
+hist(fitted(r0),col="gray",breaks=50)
+
+fixef(r0)
+rr <- ranef(r0)
+
+class(rr$cond) <- "ranef.mer"
+lattice::dotplot(rr$cond)$year
+lattice::dotplot(rr$cond)$county
+
+dd <- as.data.frame(rr)
+
+op <- par(mfrow=c(2,2))
+pp <- data.frame(pred=predict(r0), obs=r0$frame$incidence,
+                 resid=residuals(r0))
+plot(resid~pred, pp)
+## plots by year and location of predicted and actual
+## e.g. plot open and closed symbols or two different shapes for
+##   0/1 observed and a colour ramp for predicted probability
+
+## it can be helpful to plot smoothed surfaces rather than points
+## kriging?
+## kernel smoothing?
+## interpolation (akima)?
+
+set.seed(101)
+## make up random {x,y,z} values
+x <- runif(20)
+y <- runif(20)
+z <- rnorm(20,sd=0.01) +  (x-y)/5^2
+## generate a grid for interpolated values
+v <- seq(0,1,length=21)
+pp <- expand.grid(x=v,y=v)
+## bivariate interpolation of the values of the original data points
+m <- interpp(x,y,z, xo=pp$x,yo=pp$y)
+mpred <- matrix(m$z,21) ## back from long to wide
+image(v,v,mpred)
+points(x,y)
+library(rgl)
+persp3d(mpred, col="gray")
+
+
+res_list <- list()
+## I guess my brain kinda broke on what else to do with this for loop
+pb <- txtProgressBar(max=nrow(parframe), style=3)
+for (i in seq(nrow(parframe))) {
+    setTxtProgressBar(pb,i) ## update progress bar
+    res_list[[i]] <- runthemodel(parframe$distcoefvec[i], 1e-150)
 }
 
-llikvec #I can't think of a nice plot for this
-#So mixedmodel loglikelihood show -1511.619 for anything under
-#Next step is optimizing? Not sure what the really means...
+llikvec <- sapply(res_list, function(x) -c(logLik(x)))
+par(las=1,bty="l")
+plot(parframe$distcoefvec,llikvec-min(llikvec),type="b",log="x")
+
+llikvec ##I can't think of a nice plot for this
+##So mixedmodel loglikelihood show -1511.619 for anything under
+##Next step is optimizing? Not sure what the really means...
+
+## transmission propto exp(-(dist(x,y)/d)^theta)
+## d is scale parameter (similar to std dev)
+## theta = 2 -> Gaussian
+## theta = 1 -> exponential
+## theta = large -> "top hat"
+## theta = small -> spike
