@@ -16,6 +16,6 @@
 #This is of glm(incidence ~ offset(log(previousyear + 1))
 #Should I not worry and just plot mixed model df
 #Should I just do residuals per variable rather than one the model
-#Why are my residuals the way they are :(
+#Why are my residuals the way they are?
 #plot is in  stelmacm/wns "Other/glmresid.png" 
 
