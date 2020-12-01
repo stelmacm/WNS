@@ -23,6 +23,8 @@ plot(glmsims)
 
 plotResiduals(foimodel, mixedmodeldf$foi) #oof
 
+#https://github.com/glmmTMB/glmmTMB/issues/625 
+
 library(brglm2)
 library(detectseparation)
 septest <- glm(incidence ~ offset(log(previousyear + 1)),
@@ -69,7 +71,7 @@ residuals(foiTMB,"pearson") #UGH
 newdata2 <- subset(mixedmodeldf,
                    abs(residuals(foiTMB,"pearson"))<10)
 
-#https://github.com/glmmTMB/glmmTMB/issues/625 
+
 
 #going to try dharma sims regardless
 #Oof DHARMa hates me... I guess bayesian is a must 
