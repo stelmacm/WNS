@@ -4,7 +4,8 @@ library(lme4)
 library(DHARMa)
 library(glmmTMB)
 library(brms)
-library(glmmADMB)
+## library(glmmADMB)
+library(ggplot2); theme_set(theme_bw())
 
 mixedmodeldf <- read.csv("data/mixedmodeldf.csv")
 mixedmodeldf$year <- factor(mixedmodeldf$year)
@@ -15,7 +16,34 @@ hist(mixedmodeldf$previousyear) #Ok...
 foimodel <- glm(incidence ~ offset(log(previousyear + 1)),
                 data = mixedmodeldf, family = binomial(link = "cloglog"))
 summary(foimodel)
-#So glm looks good.
+coef(foimodel)
+##So glm looks good.
+
+foimodel2 <- glm(incidence ~ log(previousyear+1),
+                 data = mixedmodeldf, family = binomial(link = "cloglog"))
+coef(summary(foimodel2))
+
+pframe <- data.frame(previousyear=seq(0,1,length=101))
+pframe$pred1 <- predict(foimodel, newdata=pframe, type="response")
+pframe$pred2 <- predict(foimodel2, newdata=pframe, type="response")
+
+ggplot(mixedmodeldf,aes(previousyear, incidence)) +
+    geom_point() +
+    scale_x_continuous(trans="log1p") +
+    geom_smooth(method="glm",
+                method.args=list(family=binomial(link="cloglog"))) +
+    geom_line(data=pframe,aes(y=pred1), colour="red") +
+    geom_line(data=pframe,aes(y=pred2), colour="green")
+
+with(mixedmodeldf,table(previousyear==0,incidence))
+
+hist(subset(mixedmodeldf,incidence==0)$previousyear,
+     col="gray",breaks=100,
+     main="uninfected counties/years only")
+
+hist(subset(mixedmodeldf,incidence==1)$previousyear,
+     col="gray",breaks=100,
+     main="infected counties/years only")
 
 glmsims <- simulateResiduals(foimodel)
 plot(glmsims)
@@ -28,10 +56,16 @@ plotResiduals(foimodel, mixedmodeldf$foi) #oof
 library(brglm2)
 library(detectseparation)
 septest <- glm(incidence ~ offset(log(previousyear + 1)),
-    data = mixedmodeldf, family = binomial(link = "cloglog"), method="detect_separation")
-#Really not understanding !fit2$converged: invalid arguement type
+               data = mixedmodeldf, family = binomial(link = "cloglog"), method="detect_separation")
+
+## https://github.com/ikosmidis/detectseparation/issues
+septest <- glm((mpg>19) ~ hp+offset(log(cyl)), data=mtcars, family=binomial(link="cloglog"))
+update(septest, method="detect_separation")
+
+#Really not understanding !fit2$converged: invalid argument type
 
 #Cant even cheat it...
+
 cheekyseptest <- update(foimodel, method = "detect_separation")
 
 #maybe I'm crazy....
@@ -56,14 +90,23 @@ newdata <- subset(mixedmodeldf,
 
 
 #This is when I tried with glmm but nothing worked
-#Mixed model formula
-formula <- incidence ~ (1|year) + (1|county) + offset(log(previousyear + 1))
+##Mixed model formula
+mixedmodeldf$c_year <- as.numeric(as.character(mixedmodeldf$year))-2007
+formula <- incidence ~ 1 + c_year + (1|year) + (1|county) + offset(log(previousyear + 1))
 
-foimm <- glmer(formula, data = mixedmodeldf, family = binomial(link = "cloglog"), nAGQ = 1)
+## foimm <- glmer(formula, data = mixedmodeldf, family = binomial(link = "cloglog"), nAGQ = 1)
 
-#Trying glmmTMB
-foiTMB <- glmmTMB(formula, data = mixedmodeldf, family = binomial(link = "cloglog"))
+##Trying glmmTMB
+## remotes::install_github("glmmTMB/glmmTMB/glmmTMB")
+form0 <- incidence ~ (1 | year) + (1 | county) + offset(log(previousyear + 1))
+foiTMB <- glmmTMB(form0, data = mixedmodeldf, family = binomial(link = "cloglog"))
+rr1 <- residuals(foiTMB)
 summary(foiTMB)
+rr <- ranef(foiTMB)$cond
+class(rr) <- "ranef.mer"
+
+lattice::dotplot(rr)$year
+lattice::dotplot(rr)$county
 #Really bad random effects... Complete seperation has occured 
 
 residuals(foiTMB,"pearson") #UGH
