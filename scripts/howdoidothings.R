@@ -1,100 +1,93 @@
-#OK so this is with a clean environment now
-#I have a fear I am looking at the wrong type residual
+#The real DHARMa SIMS code block
 library(tidyverse)
-library(gstat)
-library(sp)
-library(maptools)
-library(reshape)
+library(lme4)
+library(DHARMa)
+library(glmmTMB)
+library(brms)
+library(glmmADMB)
 
-realvspreddata <- read.csv("data/realvspred.csv") %>%
-  mutate(year.x = factor(year.x))
+mixedmodeldf <- read.csv("data/mixedmodeldf.csv")
+mixedmodeldf$year <- factor(mixedmodeldf$year)
 
-#Tried many types of ways of interpolation 
-#All of them look incredible rough and ugly
+hist(mixedmodeldf$previousyear) #Ok...
 
-testyear <- realvspreddata %>% filter(year.x == 2009)
-testyear <- na.omit(testyear)
+#just glm model
+foimodel <- glm(incidence ~ offset(log(previousyear + 1)),
+                data = mixedmodeldf, family = binomial(link = "cloglog"))
+summary(foimodel)
+#So glm looks good.
 
-akimatest <- interp(x = testyear$lon, y = testyear$lat, z = testyear$rawred, 
-                    xo = seq(min(testyear$lon), max(testyear$lon), by = .1), 
-                    yo = seq(min(testyear$lat), max(testyear$lat), by = .1),
-                    duplicate = "strip")
-image(akimatest, col = rainbow(16, start = .6, end = .1))
-#different viz of akima
-#examp is lon lat eresid
+glmsims <- simulateResiduals(foimodel)
+plot(glmsims)
+#deviation significant...
 
-examp <- testyear %>% dplyr::select(lon, lat, rawred)
-d1 <- with(examp, interp(x = testyear$lon, y = testyear$lat, z = (testyear$eresid), 
-                         xo = seq(min(testyear$lon), max(testyear$lon), by = .1), 
-                         yo = seq(min(testyear$lat), max(testyear$lat), by = .1),
-                         duplicate = "strip"))
+plotResiduals(foimodel, mixedmodeldf$foi) #oof
 
-d2 <- melt(d1$z, na.rm = TRUE)
-head(d2)
-names(d2) <- c("x", "y", "eresid")
+library(brglm2)
+library(detectseparation)
+septest <- glm(incidence ~ offset(log(previousyear + 1)),
+    data = mixedmodeldf, family = binomial(link = "cloglog"), method="detect_separation")
+#Really not understanding !fit2$converged: invalid arguement type
 
-d2$lon <- d1$x[d2$x]
-d2$lat <- d1$y[d2$y]
+#Cant even cheat it...
+cheekyseptest <- update(foimodel, method = "detect_separation")
 
-usa <- map_data("usa")
+#maybe I'm crazy....
+infcheck <- check_infinite_estimates(foimodel)
+plot(infcheck)
+#So MLE doesnt go to infinity...
 
-#Very VERY ugly. I'm not happy with this but other things never worked
-ggplot() +
-  geom_tile(data = d2, aes(x = lon, y = lat, fill = eresid)) +
-  geom_path(data = usa, aes(x = long, y = lat, group = group)) + 
-  scale_fill_gradient(low = "blue", high = "red", na.value = "white") +
-  theme_classic() 
-#Side question, how do I change alpha
+#This was dumb
+detect_separation_control(
+  implementation =  "lpSolveAPI", #ROI or lpSolveAPI
+  solver = "lpsolve",
+  linear_program = "dual", #Primal or dual... 
+  #*me acting like I know why I'm picking dual...*
+  purpose =  "test", #find or test
+  tolerance = 1e-04,
+  solver_control = list()
+)
+
+#maybe if I get rid of my ugly data all my problems will go away
+newdata <- subset(mixedmodeldf,
+                  abs(resid(foimodel, "pearson"))<10) #Nothing goes away....
 
 
-#OPTION 2
+#This is when I tried with glmm but nothing worked
+#Mixed model formula
+formula <- incidence ~ (1|year) + (1|county) + offset(log(previousyear + 1))
 
-coordinates(testyear) = ~ lon + lat
-#possible to create 
-x.range <- as.integer(range(testyear@coords[,1]))
-y.range <- as.integer(range(testyear@coords[,2]))
+foimm <- glmer(formula, data = mixedmodeldf, family = binomial(link = "cloglog"), nAGQ = 1)
 
-#Changing grid bc obviously this sucks
-x.range <- as.integer(c(-110, -51))
-y.range <- as.integer(c(25, 54))
+#Trying glmmTMB
+foiTMB <- glmmTMB(formula, data = mixedmodeldf, family = binomial(link = "cloglog"))
+summary(foiTMB)
+#Really bad random effects... Complete seperation has occured 
 
-grd <- expand.grid(x=seq(from=x.range[1], to=x.range[2], by=.5),
-                   y=seq(from=y.range[1], to=y.range[2], by=.5))
+residuals(foiTMB,"pearson") #UGH
 
-coordinates(grd) = ~ x + y
-gridded(grd) <- TRUE
+newdata2 <- subset(mixedmodeldf,
+                   abs(residuals(foiTMB,"pearson"))<10)
 
-#Now doing IDW
+#https://github.com/glmmTMB/glmmTMB/issues/625 
 
-idw<-idw(formula = eresid ~ 1, locations = testyear, newdata = grd)
+#going to try dharma sims regardless
+#Oof DHARMa hates me... I guess bayesian is a must 
+foiTMBressims <- simulateResiduals(foiTMB)
 
-idw.output=as.data.frame(idw)
-names(idw.output)[1:3]<-c("long","lat","var1.pred")
+#glmmADMB crashes my computer....
+#foiadmb <- glmmadmb(incidence ~ (1|year) + county + offset(log(previousyear + 1)), data = mixedmodeldf, family = "binomial", link = "cloglog")
+#all random effects must be factors?
 
-w <- ggplot(data = idw.output, aes(x = long, y = lat)) +
-  geom_tile(data = idw.output, aes(fill = var1.pred)) +
-  geom_path(data = usa, aes(x = long, y = lat, group = group)) +
-  scale_fill_gradient(low = "blue", high = "red") +
-  coord_equal()
-w
-#Now just fit the variogram ez pz right?
-semivariog<-variogram(eresid~1, locations=testyear, data=testyear)
 
-model.variog<-vgm(psill=0.2, model="Sph", nugget=.75, range=20) 
-#spline method hates me so spherical for now...
-fit.variog<-fit.variogram(semivariog, model.variog)
-plot(semivariog, fit.variog)
+#This takes so long but a quick way to check my sanity
+foibrms <- brm(formula, data = mixedmodeldf, family = binomial(link = "cloglog"))
+summary(foibrms)
+#brms tells me this is garbage with r-hat of 4.22
+#Chains aren't mixing
+#ESS is too low?
+#Probably need thining and like proper priors..
 
-#Krige
-krig<-krige(formula=eresid ~ 1, locations=testyear, newdata=grd, model=model.variog)
-#All the warnings are skips :(
-#Maybe I need to reconsider formula....
-krig.output=as.data.frame(krig)
-names(krig.output)[1:3]<-c("long","lat","var1.pred")
-
-cry<- ggplot(data = krig.output, aes(x = long, y = lat)) +
-  geom_tile(data = krig.output, aes(fill = var1.pred)) +
-  theme_classic()
-#geom_path(data = states, aes(x = long, y = lat, group = group)) +
-#scale_fill_gradient(low = "blue", high = "red")
-cry #Change variable later
+vignette("mcmc", package="glmmTMB")
+vignette("model_evaluation",
+         package="glmmTMB")
