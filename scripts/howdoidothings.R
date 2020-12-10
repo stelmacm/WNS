@@ -7,6 +7,7 @@ library(brms)
 library(glmmADMB)
 library(lattice)
 library(broom.mixed)
+library(viridisLite)
 
 mixedmodeldf <- read.csv("data/mixedmodeldf.csv")
 mixedmodeldf$year <- factor(mixedmodeldf$year)
@@ -102,7 +103,8 @@ gg0 + facet_wrap(~grpvar,ncol=2,scale="free")
 
 ggplot(aa2, aes(x=condval, xmin=condval-2*condsd, xmax=condval+2*condsd,
                y=county, colour=first_yr)) +
-    geom_pointrange()
+    geom_pointrange() +
+    scale_colour_viridis_d()
 
 
 
