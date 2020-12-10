@@ -4,135 +4,64 @@ library(lme4)
 library(DHARMa)
 library(glmmTMB)
 library(brms)
-## library(glmmADMB)
-library(ggplot2); theme_set(theme_bw())
+library(glmmADMB)
+library(lattice)
+library(brms)
 
 mixedmodeldf <- read.csv("data/mixedmodeldf.csv")
 mixedmodeldf$year <- factor(mixedmodeldf$year)
+mixedmodeldf$previnf <- (lag(mixedmodeldf$incidence))
 
-hist(mixedmodeldf$previousyear) #Ok...
+#So problem with mixed modeldf is that the years continue once incidence has 
+#occered. So it is redundant.
+
+#Changing to disappear after incidence occures
+newdf <- mixedmodeldf %>% subset((incidence == 0) | (incidence == 1 & previnf == 0))
 
 #just glm model
 foimodel <- glm(incidence ~ offset(log(previousyear + 1)),
-                data = mixedmodeldf, family = binomial(link = "cloglog"))
+                data = newdf, family = binomial(link = "cloglog"))
 summary(foimodel)
-coef(foimodel)
-##So glm looks good.
-
-foimodel2 <- glm(incidence ~ log(previousyear+1),
-                 data = mixedmodeldf, family = binomial(link = "cloglog"))
-coef(summary(foimodel2))
-
-pframe <- data.frame(previousyear=seq(0,1,length=101))
-pframe$pred1 <- predict(foimodel, newdata=pframe, type="response")
-pframe$pred2 <- predict(foimodel2, newdata=pframe, type="response")
-
-ggplot(mixedmodeldf,aes(previousyear, incidence)) +
-    geom_point() +
-    scale_x_continuous(trans="log1p") +
-    geom_smooth(method="glm",
-                method.args=list(family=binomial(link="cloglog"))) +
-    geom_line(data=pframe,aes(y=pred1), colour="red") +
-    geom_line(data=pframe,aes(y=pred2), colour="green")
-
-with(mixedmodeldf,table(previousyear==0,incidence))
-
-hist(subset(mixedmodeldf,incidence==0)$previousyear,
-     col="gray",breaks=100,
-     main="uninfected counties/years only")
-
-hist(subset(mixedmodeldf,incidence==1)$previousyear,
-     col="gray",breaks=100,
-     main="infected counties/years only")
-
+#So glm looks good.
 glmsims <- simulateResiduals(foimodel)
-plot(glmsims)
-#deviation significant...
+plot(glmsims) #I dont think I underestand res vs pred
 
-plotResiduals(foimodel, mixedmodeldf$foi) #oof
+plotResiduals(foimodel, newdf$foi) #this makes sense I think
 
-#https://github.com/glmmTMB/glmmTMB/issues/625 
+formula <- incidence ~ (1|year) + (1|county) + offset(log(previousyear + 1))
 
-library(brglm2)
-library(detectseparation)
-septest <- glm(incidence ~ offset(log(previousyear + 1)),
-               data = mixedmodeldf, family = binomial(link = "cloglog"), method="detect_separation")
+foimm <- glmer(formula, data = newdf, family = binomial(link = "cloglog"))
+summary(foimm) #Year is a ~tad~ high
 
-## https://github.com/ikosmidis/detectseparation/issues
-septest <- glm((mpg>19) ~ hp+offset(log(cyl)), data=mtcars, family=binomial(link="cloglog"))
-update(septest, method="detect_separation")
+glmmsims <- simulateResiduals(foimm)
+plot(glmmsims) #Not that nice...
 
-#Really not understanding !fit2$converged: invalid argument type
+plotResiduals(foimm)
 
-#Cant even cheat it...
+#Trying to cheat...Maybe wrong approach to large eigenvalue problem
+foimm2 <- glmer(formula, data = newdf, family = binomial(link = "cloglog"),
+                control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
 
-cheekyseptest <- update(foimodel, method = "detect_separation")
+#Trying glmmTMB
+foiTMB <- glmmTMB(formula, data = newdf, family = binomial(link = "cloglog"))
+summary(foiTMB) #Its actually a bit worse?
+#Still cant figure it out...
+tmbsims <- simulateResiduals(foiTMB) #oof
 
-#maybe I'm crazy....
-infcheck <- check_infinite_estimates(foimodel)
-plot(infcheck)
-#So MLE doesnt go to infinity...
-
-#This was dumb
-detect_separation_control(
-  implementation =  "lpSolveAPI", #ROI or lpSolveAPI
-  solver = "lpsolve",
-  linear_program = "dual", #Primal or dual... 
-  #*me acting like I know why I'm picking dual...*
-  purpose =  "test", #find or test
-  tolerance = 1e-04,
-  solver_control = list()
-)
-
-#maybe if I get rid of my ugly data all my problems will go away
-newdata <- subset(mixedmodeldf,
-                  abs(resid(foimodel, "pearson"))<10) #Nothing goes away....
-
-
-#This is when I tried with glmm but nothing worked
-##Mixed model formula
-mixedmodeldf$c_year <- as.numeric(as.character(mixedmodeldf$year))-2007
-formula <- incidence ~ 1 + c_year + (1|year) + (1|county) + offset(log(previousyear + 1))
-
-## foimm <- glmer(formula, data = mixedmodeldf, family = binomial(link = "cloglog"), nAGQ = 1)
-
-##Trying glmmTMB
-## remotes::install_github("glmmTMB/glmmTMB/glmmTMB")
-form0 <- incidence ~ (1 | year) + (1 | county) + offset(log(previousyear + 1))
-foiTMB <- glmmTMB(form0, data = mixedmodeldf, family = binomial(link = "cloglog"))
-rr1 <- residuals(foiTMB)
-summary(foiTMB)
 rr <- ranef(foiTMB)$cond
 class(rr) <- "ranef.mer"
 
-lattice::dotplot(rr)$year
-lattice::dotplot(rr)$county
-#Really bad random effects... Complete seperation has occured 
+dotplot(rr)$year #Good
+dotplot(rr)$county #Oh my....
 
-residuals(foiTMB,"pearson") #UGH
+#going to lightly try going bayesian
+foibrms <- brm(formula, data = newdf, family = binomial(link = "cloglog"))
+summary(foibrms) #Terrible, Uglt
 
-newdata2 <- subset(mixedmodeldf,
-                   abs(residuals(foiTMB,"pearson"))<10)
+foibrmpairs <- pairs(foibrms) #See WNS/figures/brmspairs.png
 
-
-
-#going to try dharma sims regardless
-#Oof DHARMa hates me... I guess bayesian is a must 
-foiTMBressims <- simulateResiduals(foiTMB)
-
-#glmmADMB crashes my computer....
-#foiadmb <- glmmadmb(incidence ~ (1|year) + county + offset(log(previousyear + 1)), data = mixedmodeldf, family = "binomial", link = "cloglog")
-#all random effects must be factors?
-
-
-#This takes so long but a quick way to check my sanity
-foibrms <- brm(formula, data = mixedmodeldf, family = binomial(link = "cloglog"))
-summary(foibrms)
-#brms tells me this is garbage with r-hat of 4.22
-#Chains aren't mixing
-#ESS is too low?
-#Probably need thining and like proper priors..
-
-vignette("mcmc", package="glmmTMB")
-vignette("model_evaluation",
-         package="glmmTMB")
+#Questions:
+#I think it is unintuitive to me how to play around with formula
+#ie mixedmodeldf$c_year <- as.numeric(as.character(mixedmodeldf$year))-2007
+#formula <- incidence ~ 1 + c_year + (1|year) + (1|county) + offset(log(previousyear + 1))
+#Unsure if this 
