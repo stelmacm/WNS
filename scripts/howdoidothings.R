@@ -7,7 +7,7 @@ library(spdep)
 bestloglik <- read_csv("data/azzaliniparam.csv") %>%
   mutate(theta = factor(theta))
 
-zoomedinalittle <- bestloglik %>% filter(ID > 5 & ID < 150)
+zoomedinalittle <- bestloglik %>% filter(ID > 5 & ID < 75)
 
 ggplot(data = zoomedinalittle, aes(x = ID, y = Loglikelihood)) +
   geom_line(aes(color = theta))
