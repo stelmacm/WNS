@@ -3,6 +3,7 @@ library(DHARMa)
 library(sf)
 library(sp)
 library(spdep)
+library(lme4)
 
 bestloglik <- read_csv("data/azzaliniparam.csv") %>%
   mutate(theta = factor(theta))
