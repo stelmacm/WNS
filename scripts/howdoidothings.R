@@ -1,14 +1,20 @@
 #Questions:
 #1. Trouble with optim a bit?
-#2. Trying to plto predictions vs actual on same graph. Doesn't look nice
+#2. Trying to plot predictions vs actual on same graph. Doesn't look nice
 #3. Joining residuals of first year of inf. Does that mean the residual of any year at
-# the occurance of just the first year that the county recieved the infection. 
+# the occurence of just the first year that the county received the infection. 
 #I think I just did 3 wrong and as I write it out I get it now oops
 
-#OPTIM PROBLEM
-#Testing different types of coord to km types
+## OPTIM PROBLEM
+## Testing different types of coord to km types
 source("scripts/packages.R")
 source("scripts/wns-presence.R")
+
+remotes::install_github("yonghah/esri2sf")
+
+library(tidyverse)
+library(sf)
+library(sp)
 
 presence.scrape <- read.csv("data/relevant-records.csv")
 
@@ -23,36 +29,38 @@ wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
 wns.center.coords <- cbind(wnslat, wnslon)
 
-d1<- distm(wns.center.coords, fun = distGeo)
+d1 <- distm(wns.center.coords, fun = distGeo)
 dimnames(d1) <- list(uniq.df$county,uniq.df$county)
 
 diag(d1) <- 0 
 #convert from m to km
 d1 <- d1/1000
+
 #Take known data
 mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
   as_tibble() %>%
   mutate(year = factor(year))
 #Remove things that don't work for me later on
-county.incidencee.by.year <- mixedmodeldf[-c(27,28,29,30,31,32,33,
-                                             34,35,36,37,38,39,
-                                             5201, 5202,5203,5204,
-                                             5205, 5206,5207,5208,5209,
-                                             5210,5211,5212,5213,
-                                             7151,7152,7153,7154,7155,7156
-                                             ,7157,7158,7159,7160,7161,7162,7163),-4]
+county.incidence.by.year <- mixedmodeldf[-c(27,28,29,30,31,32,33,
+                                            34,35,36,37,38,39,
+                                            5201, 5202,5203,5204,
+                                            5205, 5206,5207,5208,5209,
+                                            5210,5211,5212,5213,
+                                            7151,7152,7153,7154,7155,7156,
+                                            7157,7158,7159,7160,7161,7162,7163),-4]
 #Only way I could figure it out is via
-countylist <- county.incidencee.by.year %>%
+countylist <- county.incidence.by.year %>%
   arrange(year) %>%
   filter(year == 2006) %>%
   dplyr::select(county)
 
-
-parametrize <- function(d, theta, a){
+parametrize <- function(p) {
+  ## unpack parameter vector, via link functions
+  d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
+  theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
+  a <- exp(p[3])           ## must be positive
   #Maybe just have to do it by hand
-  azzelinifun <- exp(-((d1
-                        
-  )/d)^theta)
+  azzelinifun <- exp(-((d1)/d)^theta)
   diag(azzelinifun) <- 0
   azzelinifun[(azzelinifun < 1e-100)] <- 0
   
@@ -66,7 +74,7 @@ parametrize <- function(d, theta, a){
   #Create dataframe of county by year filled with incidence
   #Retake first year english so that sentence makes sense
   for(i in levels(mixedmodeldf$year)){
-    countylist[,i] <- county.incidencee.by.year %>%
+    countylist[,i] <- county.incidence.by.year %>%
       arrange(year) %>%
       filter(year == i) %>%
       dplyr::select(incidence)
@@ -80,7 +88,7 @@ parametrize <- function(d, theta, a){
   #Another for loop
   
   #Create a base layer to begin with
-  foidf <- county.incidencee.by.year %>%
+  foidf <- county.incidence.by.year %>%
     arrange(year) %>%
     filter(year == 2006) %>%
     dplyr::select(county)
@@ -128,20 +136,24 @@ parametrize <- function(d, theta, a){
   foimm <- glmer(formula, data = newdf, family = binomial(link = "cloglog"))
   
   optimalloglik <- logLik(foimm)
-  return(optimalloglik)
+  return(-1*c(optimalloglik))
 }
 
-#From my understanding you pick a "range" for the parameters to be tested at
-#They are going downward because I tried upwards and maybe that is making a difference???
-test <- parametrize(60,2,1)
-#d
+##From my understanding you pick a "range" for the parameters to be tested at
+##They are going downward because I tried upwards and maybe that is making a difference???
+## inverse-link functions: identity, 2*plogis(x), exp()
+## link functions: identity, qlogis(x/2), log()
+
+linkfun <- function(p) c(p[1], qlogis(p[2]/2), log(p[3]))
+test <- parametrize(linkfun(c(60,2,1)))
+# d
 d <- seq(100,5,-5)
-#theta
+# theta
 theta <- seq(2,0.9,-.1)
 #a
 a <- seq(0.01,1,0.01)
 #I have tried lots of different methods for doing things. More so confused throughout
-bestparams <- optim(par = c(2,0.9,0.1), fn = parametrize,theta = theta, a = a, control = list(fnscale = -1))
+bestparams <- optim(par = linkfun(c(2,0.9,0.1)), fn = parametrize, control=list(trace=1000))
 
 #Now testing for optimal a value to add to log in order to make a simpler version
 
@@ -161,7 +173,7 @@ avalueparam <- function(a){
   #Create dataframe of county by year filled with incidence
   #Retake first year english so that sentence makes sense
   for(i in levels(mixedmodeldf$year)){
-    countylist[,i] <- county.incidencee.by.year %>%
+    countylist[,i] <- county.incidence.by.year %>%
       arrange(year) %>%
       filter(year == i) %>%
       dplyr::select(incidence)
@@ -175,7 +187,7 @@ avalueparam <- function(a){
   #Another for loop
   
   #Create a base layer to begin with
-  foidf <- county.incidencee.by.year %>%
+  foidf <- county.incidence.by.year %>%
     arrange(year) %>%
     filter(year == 2006) %>%
     dplyr::select(county)
