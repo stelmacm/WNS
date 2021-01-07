@@ -6,7 +6,29 @@
 #I think I just did 3 wrong and as I write it out I get it now oops
 
 #OPTIM PROBLEM
+#Testing different types of coord to km types
+source("scripts/packages.R")
+source("scripts/wns-presence.R")
 
+presence.scrape <- read.csv("data/relevant-records.csv")
+
+#Remove Cali and Wash for now
+uniq.df <- (presence.df
+            %>% dplyr::filter(!STATEPROV %in% c("California","Washington"),
+                              !duplicated(county)) #so we only have unique counties
+)
+
+wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
+wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
+
+wns.center.coords <- cbind(wnslat, wnslon)
+
+d1<- distm(wns.center.coords, fun = distGeo)
+dimnames(d1) <- list(uniq.df$county,uniq.df$county)
+
+diag(d1) <- 0 
+#convert from m to km
+d1 <- d1/1000
 #Take known data
 mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
   as_tibble() %>%
