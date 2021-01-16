@@ -160,18 +160,21 @@ p <- ggplot() +
 
 p
 
-infodf <- na.omit(newdf)
-infodf$pearsonres <- residuals(foimm, type = "pearson")
+infodf0 <- na.omit(newdf)
+infodf0$pearsonres <- residuals(foimm, type = "pearson")
 
-infodf <- left_join(infodf, latloninfo, "county")
 
-outliers <- infodf %>% filter(pearsonres > 2)
+## not idempotent
+## idempotent = f(f(x)) = f(x)
+infodf <- left_join(infodf0, latloninfo, "county")
+
+outliers <- infodf %>% filter(abs(pearsonres) > 2) %>% arrange(pearsonres)
 View(outliers)
 
 
 l <- ggplot() +
     geom_path(data = states, aes(x = long, y = lat, group = group)) +
-    geom_point(data = outliers, aes(x = lon, y = lat, colour = pearsonres)) +
+    geom_point(data = outliers, aes(x = lon, y = lat, colour = cut_width(pearsonres,2)),size=5) +
     coord_equal() +
     theme_minimal() 
 
