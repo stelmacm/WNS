@@ -67,3 +67,63 @@ attempt3 <- mle2(minuslogl = binomNLL1, start = list(p = .5),
 
 source("scripts/fullmodeltorun.R")
 Matrix::image(localcountymat.m)
+
+
+
+#####
+set.seed(101)
+N <- 100
+x <- rnorm(N)
+eta <- -3 + 2*x
+dd <- data.frame(x,y=rbinom(N, prob=plogis(eta), size=1))
+
+m1 <- glm(y~1+x, data=dd, family=binomial)
+stats::confint.default(m1)  ## WALD confidence intervals
+## Waiting for profiling to be done...
+## loading/calling MASS::confint.glm
+confint(m1)
+
+## function parameterized with a vector
+## (this is what optim likes)
+binomNLL <- function(p) {
+    eta <- p[1] + p[2]*dd$x
+    return(-sum(dbinom(dd$y, prob=plogis(eta), size=1, log=TRUE)))
+}
+op1 <- optim(fn=binomNLL, par=c(0,0), hessian=TRUE)
+op1$par
+op1$par + qnorm(0.975)*sqrt(diag(solve(op1$hessian))) ## Wald CIs
+
+## returns a FUNCTION that calculates the likelihood for (fixedp1, *)
+## i.e. we're going to use it to find the best p2 for a given fixed p1
+binomwrap <- function(fixedp1) {
+    function(p) binomNLL(c(fixedp1,p))
+}
+p1vec <- seq(-4, 0, length=51)
+nllvec <- numeric(length(p1vec))
+for (i in seq_along(p1vec)) {
+    nllvec[i] <- optim(par=0, fn= binomwrap(p1vec[i]),method="BFGS")$val
+}
+plot(p1vec,nllvec,ylim=c(30,35))
+abline(v=op1$par[1])
+abline(h=op1$val+1.92)
+
+## parameterized using a list of arguments
+## (this is what mle2 likes)
+binomNLL2 <- function(b0, b1) {
+    eta <- b0 + b1*x
+    return(-sum(dbinom(y, prob=plogis(eta), size=1, log=TRUE)))
+}
+
+m2 <- mle2(minuslogl=binomNLL2, start=list(b0=0,b1=0), data=dd)
+## stats:::confint.default(m1)  ### ???
+confint(m2, method="quad")
+confint(m2)
+confint(m1) ## compare with GLM profile CIs
+
+## setting up an optim-style objective function for use with mle2
+parnames(binomNLL) <- c("b0","b1")  ## assign the parameter names
+m2B <- mle2(minuslogl=binomNLL,
+            vecpar=TRUE, ## tells mle2 that the obj function uses a vector
+            start=list(b0=0,b1=0),
+            data=dd)
+all(coef(m2B)==coef(m2))
