@@ -19,6 +19,19 @@ source("scripts/wns-presence.R")
 
 #All possible data sets
 presence.scrape <- read.csv("data/relevant-records.csv")
+
+presence.scrape %>% dplyr::select(year,lat,lon) %>% distinct() %>% nrow()  ## 52 lat/lon/year combinations
+presence.scrape %>% dplyr::select(county) %>% distinct() %>% nrow()  ## 553 counties
+pp <- (presence.scrape %>% dplyr::select(lat,lon) %>% distinct())
+nrow(pp)
+
+## quickie map
+library(mapdata)
+library(ggplot2)
+usa <- map_data("usa")
+ggplot() + geom_polygon(data = usa, aes(x=long, y = lat, group = group), fill=NA, colour="black") +
+    stat_sum(data=presence.scrape,aes(x=lon,y=lat),alpha=0.5)
+
 gcshareduser <- read.csv("data/gc-shared-users.csv") #This is the problem
 #view(gcshareduser)
 mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
@@ -30,6 +43,15 @@ uniq.df <- (presence.df
                               !duplicated(county)) #so we only have unique counties
 )
 
+
+## BMB: MAYBE ?
+(presence.df
+    %>% dplyr::filter(!STATEPROV %in% c("California","Washington"))
+    %>% dplyr::select(county,geoms)
+    %>% distinct()
+##    %>% nrow()
+)
+                      
 wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
 wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
@@ -46,19 +68,25 @@ d1 <- d1/1000
 united.xy <- uniq.df$geoms %>% st_centroid() %>% 
   st_transform(., "+proj=longlat +datum=WGS84")
 
+keep_types <- c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")
 county_visits <- presence.scrape %>%
-  filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
+  filter(Type %in% keep_types) %>%
   group_by(county,year,lon,lat) %>% 
   distinct(User) %>%
-  summarise(total = length(User))
+    summarise(total = length(User)) %>%
+    arrange(lon,lat,year)
+## or: summarise(total=length(unique(User))) ?
 
 ## Number of intersecting sites within a given radius (10km)
-site_visits<-presence.scrape %>%
-  filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
+site_visits <- presence.scrape %>%
+  filter(Type %in% keep_types) %>%
   group_by(GC,year,lon,lat) %>% 
   distinct(User) %>%
-  summarise(total = length(User)) %>% st_as_sf(coords=c("lat","lon"),crs = 4326)
+    summarise(total = length(User))  %>%
+    arrange(lon,lat,year) %>%
+    st_as_sf(coords=c("lat","lon"),crs = 4326)
 
+## 
 n_local_neighbors <- lengths(st_is_within_distance(site_visits, dist = 100000))
 
 # need the number of visits at county level that match up with county centroids
@@ -66,6 +94,7 @@ n_local_neighbors <- lengths(st_is_within_distance(site_visits, dist = 100000))
 # then grab total vists
 
 just.gc <- presence.scrape %>% filter(!is.na(GC))
+## or drop_na(GC)
 
 # get the number of shared users
 shared.users<-NULL
