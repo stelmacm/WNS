@@ -1,129 +1,123 @@
-#January 27th Meeting notes
+#Original problem: I am a mess
+#Repurcussions: GC-shared-users.csv
+#This df is created, in geocache-weight.R but it doesnt
+#match what is in the csv
+#Problem 2: they have different number of cave visits, the one I can recreate
+#only has 5 cave visits, the other, has 272 visits.
+#The problem is counties are not labelled with states and there are 11 Marion
+#counties in America.
+#I also cant remake it because the script that makes it makes something completely
+#else
+#I am playing Scooby-doo and doing the mystery hunt but unsuccessful so far
+#At a certain point do I just guess what state the unknown counties are in
 
-library(tidyverse)
 
-#The data frame with the best parameters
-hessian <- read.csv("data/paramhessian.csv")
-hessian <- hessian[,-1]
-hessian.inv <- solve(hessian)
-param.se <- sqrt(diag(hessian.inv))
-param.se
-
-#Create Confidence interval matrix 
-CI.matrix <- as.data.frame(matrix(NA, nrow = 3, ncol = 3))
-#Parameters from optim function 
-bestparams <- c(9.501744, -1.066294, -6.065743)
-
-CI.matrix[1,] <- bestparams
-CI.matrix[2,] <- bestparams - 1.96 * param.se
-CI.matrix[3,] <- bestparams + 1.96 * param.se
-names(CI.matrix) <- c("scaling parameter", "theta", "a")
-rownames(CI.matrix) <- c("ML", "95% Lower bound", "95% Upper bound")
-
-CI.matrix$theta <- plogis(CI.matrix$theta)*2
-CI.matrix$a <- exp(CI.matrix$a)
-
-CI.matrix
-#And I hope this is the CI of each param
-
-#What I actually wanted to do
-
-newdf <- read.csv("data/bestparammixeddf.csv")
-library(bbmle)
-#The construction of thinge needed to run the function
+#Going to take shared users from way over
+#Merge with the melted foi matrix
 source("scripts/packages.R")
-source("scripts/countylistanddistmatrix.R") 
-source("scripts/parametrizefunction.R") #Just the function
+source("scripts/wns-presence.R")
 
-#Now to use mle2 wrapper of optim instead of optim I need to choose appropriate
-#Values from the mixed model df which is what newdf
+#All possible data sets
+presence.scrape <- read.csv("data/relevant-records.csv")
+gcshareduser <- read.csv("data/gc-shared-users.csv") #This is the problem
+#view(gcshareduser)
+mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
+  as_tibble() %>%
+  mutate(year = factor(year))
+#Remove Cali and Wash for now
+uniq.df <- (presence.df
+            %>% dplyr::filter(!STATEPROV %in% c("California","Washington"),
+                              !duplicated(county)) #so we only have unique counties
+)
 
-#when using bbmle I need to know what I have
-#p = 0.50
-#N = 546 (Number of unique counties)
-#k = 12 (number of years to infect a county??)
-#But once a county is infected, the data for the remaining years is cut
+wnslat <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[1]])
+wnslon <- map_dbl(uniq.df$geoms, ~st_centroid(.x)[[2]])
 
-#Now I want to use newdf to create the mle2 thing
-subsetdf <- newdf %>% filter(incidence == 1)
+wns.center.coords <- cbind(wnslat, wnslon)
 
-#Tried lots of things and this was the one that made me feel I
-#was going in the right direction
+d1 <- distm(wns.center.coords, fun = distGeo)
+dimnames(d1) <- list(uniq.df$county,uniq.df$county)
 
-#p = prob, k = success, N= number of trials 
-binomNLL1 = function(p, k, N) {
-  -sum(dbinom(k, prob = p, size = N, log = TRUE)) 
-}
-unique(newdf$county)
-nrow(subsetdf)
-#I realize this looks like a bad attempt but there were 100 others that were much worse
+diag(d1) <- 0 
+#convert from m to km
+d1 <- d1/1000
 
-attempt3 <- mle2(minuslogl = binomNLL1, start = list(p = .5),
-                 data = list(N = nrow(546), k = 12))
+#Creating shared users
+united.xy <- uniq.df$geoms %>% st_centroid() %>% 
+  st_transform(., "+proj=longlat +datum=WGS84")
 
+county_visits <- presence.scrape %>%
+  filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
+  group_by(county,year,lon,lat) %>% 
+  distinct(User) %>%
+  summarise(total = length(User))
 
-#Also realized that with the current parameters, creating the weight matrix 
-#all the counties are connected
+## Number of intersecting sites within a given radius (10km)
+site_visits<-presence.scrape %>%
+  filter(Type %in% c("Type.found_it", "Type.didnt_find_it", "Type.owner_maintenance", "Type.publish_listing")) %>%
+  group_by(GC,year,lon,lat) %>% 
+  distinct(User) %>%
+  summarise(total = length(User)) %>% st_as_sf(coords=c("lat","lon"),crs = 4326)
 
-source("scripts/fullmodeltorun.R")
-Matrix::image(localcountymat.m)
+n_local_neighbors <- lengths(st_is_within_distance(site_visits, dist = 100000))
 
+# need the number of visits at county level that match up with county centroids
+# match centroid back to county
+# then grab total vists
 
+just.gc <- presence.scrape %>% filter(!is.na(GC))
 
-#####
-set.seed(101)
-N <- 100
-x <- rnorm(N)
-eta <- -3 + 2*x
-dd <- data.frame(x,y=rbinom(N, prob=plogis(eta), size=1))
-
-m1 <- glm(y~1+x, data=dd, family=binomial)
-stats::confint.default(m1)  ## WALD confidence intervals
-## Waiting for profiling to be done...
-## loading/calling MASS::confint.glm
-confint(m1)
-
-## function parameterized with a vector
-## (this is what optim likes)
-binomNLL <- function(p) {
-    eta <- p[1] + p[2]*dd$x
-    return(-sum(dbinom(dd$y, prob=plogis(eta), size=1, log=TRUE)))
-}
-op1 <- optim(fn=binomNLL, par=c(0,0), hessian=TRUE)
-op1$par
-op1$par + qnorm(0.975)*sqrt(diag(solve(op1$hessian))) ## Wald CIs
-
-## returns a FUNCTION that calculates the likelihood for (fixedp1, *)
-## i.e. we're going to use it to find the best p2 for a given fixed p1
-binomwrap <- function(fixedp1) {
-    function(p) binomNLL(c(fixedp1,p))
-}
-p1vec <- seq(-4, 0, length=51)
-nllvec <- numeric(length(p1vec))
-for (i in seq_along(p1vec)) {
-    nllvec[i] <- optim(par=0, fn= binomwrap(p1vec[i]),method="BFGS")$val
-}
-plot(p1vec,nllvec,ylim=c(30,35))
-abline(v=op1$par[1])
-abline(h=op1$val+1.92)
-
-## parameterized using a list of arguments
-## (this is what mle2 likes)
-binomNLL2 <- function(b0, b1) {
-    eta <- b0 + b1*x
-    return(-sum(dbinom(y, prob=plogis(eta), size=1, log=TRUE)))
+# get the number of shared users
+shared.users<-NULL
+for (i.year in unique(just.gc$year)) {
+  s <- dplyr::filter(just.gc,year == i.year)
+  for (county1 in unique(s$county)) {
+    for (county2 in rev(unique(s$county))) {
+      num.shared<-length(intersect(as.character(s[which(s$county == county1),]$User),
+                                   as.character(s[which(s$county == county2),]$User)))
+      shared.users<-as.data.frame(rbind(shared.users,cbind(i.year,county1,county2,num.shared)))
+    }
+  }
 }
 
-m2 <- mle2(minuslogl=binomNLL2, start=list(b0=0,b1=0), data=dd)
-## stats:::confint.default(m1)  ### ???
-confint(m2, method="quad")
-confint(m2)
-confint(m1) ## compare with GLM profile CIs
+#Might just want to make dataframe from soley this
+shared.users<-tidyr::expand(shared.users,county1,county2,i.year) %>% left_join(shared.users)
+shared.users<-shared.users[shared.users$county1!=shared.users$county2,] #Gets rid of diag,
+shared.users$i.year<-as.numeric(as.character(shared.users$i.year))
+shared.users$county1<-as.character(shared.users$county1)
+shared.users$county2<-as.character(shared.users$county2)
 
-## setting up an optim-style objective function for use with mle2
-parnames(binomNLL) <- c("b0","b1")  ## assign the parameter names
-m2B <- mle2(minuslogl=binomNLL,
-            vecpar=TRUE, ## tells mle2 that the obj function uses a vector
-            start=list(b0=0,b1=0),
-            data=dd)
-all(coef(m2B)==coef(m2))
+shared.users <- shared.users %>% dplyr::rename(year= i.year)
+
+#Going back to playing with d1 which has the county-state names that I want
+d1long <- reshape2::melt(d1)[reshape2::melt(upper.tri(d1))$value,]
+biglongdf <- as.data.frame(d1long)
+names(biglongdf) <- c("county","county2","distance")
+biglongdf <- biglongdf %>% arrange(county)
+
+#Just checking were okay
+nrow(biglongdf)
+n_distinct(biglongdf$county2)
+#547*547
+#we are not okay..
+
+#I will ignore all my problems until they go away
+#Join to the final model df
+biggerdf <- left_join(mixedmodeldf,biglongdf, by = "county")
+nrow(biggerdf) #Starting to worry what this does to my computer
+#gonna clean out just a big
+biggerdf <- biggerdf %>% dplyr::select(-c(distance, yc))
+
+#BIG PROBLEM -> gcsharedusers and shared.users do not provide same list of users
+#One has many more visits that the other
+
+#Need to change the name so that we can left join
+shared.users <- shared.users %>% rename(county = county1)
+shared.users$year <- factor(shared.users$year)
+
+#Now I want to join the shared users into this
+allatonce <- left_join(biggerdf, shared.users, by= c("county", "county2", "year"))
+nrow(allatonce)
+allatonce$num.shared[is.na(allatonce$num.shared)] <- 0
+visits <- (allatonce$num.shared > 0) #proves its garbage 
+sum(visits) #5 total visits across 11 years and 547 counties
