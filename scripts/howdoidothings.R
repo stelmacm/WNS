@@ -19,10 +19,16 @@ source("scripts/wns-presence.R")
 
 #All possible data sets
 presence.scrape <- read.csv("data/relevant-records.csv")
+presence.scrape <- read.csv("tmp.csv")
 
+nrow(presence.scrape)
+sum(is.na(presence.scrape$lon))
+sum(is.na(presence.scrape$lat))
 presence.scrape %>% dplyr::select(year,lat,lon) %>% distinct() %>% nrow()  ## 52 lat/lon/year combinations
 presence.scrape %>% dplyr::select(county) %>% distinct() %>% nrow()  ## 553 counties
+presence.scrape %>% dplyr::select(STATEPROV,COUNTYNAME) %>% distinct() %>% nrow()  ## 553 counties
 pp <- (presence.scrape %>% dplyr::select(lat,lon) %>% distinct())
+presence.scrape %>% drop_na(lat,lon) %>% dplyr::select(county) %>% distinct() %>% nrow()
 nrow(pp)
 
 ## quickie map
@@ -30,7 +36,7 @@ library(mapdata)
 library(ggplot2)
 usa <- map_data("usa")
 ggplot() + geom_polygon(data = usa, aes(x=long, y = lat, group = group), fill=NA, colour="black") +
-    stat_sum(data=presence.scrape,aes(x=lon,y=lat),alpha=0.5)
+    stat_sum(data=presence.scrape,aes(x=lat,y=lon),alpha=0.5)
 
 gcshareduser <- read.csv("data/gc-shared-users.csv") #This is the problem
 #view(gcshareduser)
