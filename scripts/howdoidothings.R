@@ -38,3 +38,10 @@ source("scripts/huntingfordifferentsharedusers.R")
 source("scripts/lonlattocountyconversion.R")
 #Finally creation of shared users df
 source("scripts/creatingsharedusersdf.R")
+
+
+##FIT:
+##  W_S = spatial weight matrix (scale, exponent)
+##  W_C = caver weight matrix (shared visits)
+## offset = log(W_S %*% incidence  + (W_C %*% incidence)/scale?? + min)
+##   (alpha*space + (1-alpha)*cavers)

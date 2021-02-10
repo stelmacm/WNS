@@ -2,7 +2,16 @@
 americanGCcounties <- read_csv("data/americancountyGCusers.csv") %>%
   na.omit() %>% rename(county = countylist2)
 
-americanGCcounties$county <- gsub("(\\w+),(\\w+)", "\\2,\\1", americanGCcounties$county)
+
+## experiment with these
+target_string <- "\\w+"  ## word chars
+target_string <- "[[:alpha:] ]+"  ## alphabetical *or* space
+target_string <- "[^,]+"  ## not comma
+
+americanGCcounties$county <- gsub(
+    sprintf("(%s),(%s)",target_string,target_string),
+    "\\2,\\1", americanGCcounties$county)
+
 
 simpleCap <- function(x) {
   s <- strsplit(x, ",")[[1]]
