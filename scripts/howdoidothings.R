@@ -1,5 +1,6 @@
 #azzalini distance matrix %*% shared users mat
 # "foi" = above mat %*% incidence vector
+library(tidyverse)
 library(DHARMa)
 library(ggeffects)
 library(lme4)
