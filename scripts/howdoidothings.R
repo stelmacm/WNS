@@ -62,4 +62,5 @@ p
 # Reading some mobility and infection papers: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6542035/
 # concern would be that shared users matrix can be relatively sparse for certain years
 # read.csv("data/sharedcountyuserslong.csv")
-# What next?
+# Maybe want to try and create (1|county1) + (1|county2) as part of model
+# I think then I would have to change the whole structure of FOI in the formula
