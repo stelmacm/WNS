@@ -8,7 +8,11 @@ simoutput <- simulateResiduals(fittedModel = foimm)
 plot(simoutput)
 hist(simoutput)
 
-summary(foimm)
+pred <- simoutput$fittedPredictedResponse
+pred2 <- rank(pred, ties.method = "average")
+pred2 <- pred2/max(pred2)
+plot(pred2,simoutput$scaledResiduals)
+plot(pred,simoutput$scaledResiduals)
 
 #a graph
 plot(fitted(foimm)~na.omit(offset(log(newdf$previnf))))
@@ -26,9 +30,11 @@ nanewdf$pred <-simulate(~ (1|year) + (1|county) + offset(log(previnf + 1)),
 
 #Now doing it with better params
 #Doing DHARMa sim from the model bc thats how DHARMa works
-simoutput <- simulateResiduals(fittedModel = model2)
-plot(simoutput)
-hist(simoutput)
+simoutput2 <- simulateResiduals(fittedModel = model2)
+plot(simoutput2)
+hist(simoutput2)
+plotResiduals(simoutput2) #oof
+
 
 summary(model2) #highest loglik from guess and check params
 
@@ -38,4 +44,6 @@ dotplot(ranef(model2))$year
 #All ugly, but I guess expected since the optim param
 #Having trouble with optim in
 #source("scripts/optimparamforsharedusers.R)
-#Read into this and am unsure where things break
+#I need to eead into this since I am unsure where things break
+
+
