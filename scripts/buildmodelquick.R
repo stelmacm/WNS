@@ -12,7 +12,8 @@ mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
   mutate(year = factor(year))
 #Remove things that don't work for me later on
 
-numbersharedcountiesusers <- read.csv("data/numbersharedcountiesusers.csv")
+numbersharedcountiesusers <- read_csv("data/weightedshareduserdf.csv") %>%
+  mutate(year = factor(year)) %>% dplyr::select(-X1)
 
 #Country incidence by year needs to have the following counties removed
 #King Washington
@@ -89,16 +90,11 @@ buildthemodel <- function(p) {
     #Set diag = 0
     diag(pp) <- 0
     
-    #Now to weight matrix
-    sharedusers.w <- mat2listw(pp, style = "W")
-    sharedusers.m <- as(sharedusers.w, "CsparseMatrix") 
-    sharedusers <- as.matrix(sharedusers.m)
-    
     #need to detach
     infectionvector <- countylist[,i]
     infectionvector <- as.matrix(infectionvector)
     
-    userstimeslocation <- rho*sharedusers + (1-rho)*orderedmat
+    userstimeslocation <- rho*pp + (1-rho)*orderedmat
     #multiply W_ij %*% I_t
     foivector <- userstimeslocation %*% infectionvector
     #reattach
