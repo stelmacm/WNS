@@ -30,3 +30,4 @@ CI.matrix #Not a good looking matrix....
 #In wsuhypparamoptim.R is the optim function and I think the problem comes
 #from using log exp for rho variable
 
+source("scripts/buildmodelquick.R")
