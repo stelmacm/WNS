@@ -1,49 +1,32 @@
+#Script fot Bolker to run
 source("scripts/packages.R")
-source("scripts/sharedusersglmm.R")
-source("scripts/buildmodelquick.R")
+source("scripts/sharedusersmatrix.R")
+source("scripts/weightedshareduserdf.R")
 
-#Original model with shared users
-#Doing DHARMa sim from the model bc thats how DHARMa works
-simoutput <- simulateResiduals(fittedModel = foimm)
-plot(simoutput)
-hist(simoutput)
+#The data frame with the best parameters
+hessian <- read.csv("data/paramshessian.csv")
+hessian <- hessian[,-1]
+hessian.inv <- solve(hessian)
+param.se <- sqrt(diag(hessian.inv))
+param.se
 
-pred <- simoutput$fittedPredictedResponse
-pred2 <- rank(pred, ties.method = "average")
-pred2 <- pred2/max(pred2)
-plot(pred2,simoutput$scaledResiduals)
-plot(pred,simoutput$scaledResiduals)
+#Create Confidence interval matrix 
+CI.matrix <- as.data.frame(matrix(NA, nrow = 3, ncol = 4))
+#Parameters from optim function 
+optimparameters <- c(9.4570985, -0.3302666, -0.8784447,  0.3435393)
 
-#a graph
-plot(fitted(foimm)~na.omit(offset(log(newdf$previnf))))
+CI.matrix[1,] <- optimparameters
+CI.matrix[2,] <- optimparameters - 1.96 * param.se
+CI.matrix[3,] <- optimparameters + 1.96 * param.se
+colnames(CI.matrix) <- c("scaling parameter", "theta", "a", "rho")
+rownames(CI.matrix) <- c("ML", "95% Lower bound", "95% Upper bound")
 
-dotplot(ranef(foimm))$county #Yikes
-dotplot(ranef(foimm))$year 
-set.seed(10)
-#Try some simulations
-nanewdf <- na.omit(newdf)
-nanewdf$pred <-simulate(~ (1|year) + (1|county) + offset(log(previnf + 1)),
-                        newdata = nanewdf,
-                        family = binomial(link = "cloglog"),
-                        newparams=list(beta=1, theta=c(1,2))) #gross
-#Not even worth plotting
+CI.matrix$theta <- plogis(CI.matrix$theta)*2
+CI.matrix$a <- exp(CI.matrix$a)
+CI.matrix$rho <- exp(CI.matrix$rho)
 
-#Now doing it with better params
-#Doing DHARMa sim from the model bc thats how DHARMa works
-simoutput2 <- simulateResiduals(fittedModel = model2)
-plot(simoutput2)
-hist(simoutput2)
-plotResiduals(simoutput2) #oof
+CI.matrix #Not a good looking matrix....
 
-
-summary(model2) #highest loglik from guess and check params
-
-dotplot(ranef(model2))$county 
-dotplot(ranef(model2))$year 
-
-#All ugly, but I guess expected since the optim param
-#Having trouble with optim in
-#source("scripts/optimparamforsharedusers.R)
-#I need to eead into this since I am unsure where things break
-
+#In wsuhypparamoptim.R is the optim function and I think the problem comes
+#from using log exp for rho variable
 
