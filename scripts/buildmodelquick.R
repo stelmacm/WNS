@@ -36,6 +36,7 @@ buildthemodel <- function(p) {
   d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
   theta <- p[2]  ## plogis -> [0,1], then double it for [0,2]
   a <- p[3]           ## must be positive
+  rho <- p[4]
   #cutoffpoint <- (1/exp(p[4]))
   #cutoffpoint <- (1e-300)
   #Maybe just have to do it by hand
@@ -97,7 +98,7 @@ buildthemodel <- function(p) {
     infectionvector <- countylist[,i]
     infectionvector <- as.matrix(infectionvector)
     
-    userstimeslocation <- sharedusers %*% pp
+    userstimeslocation <- rho*sharedusers + (1-rho)*orderedmat
     #multiply W_ij %*% I_t
     foivector <- userstimeslocation %*% infectionvector
     #reattach
@@ -139,6 +140,12 @@ buildthemodel <- function(p) {
   
 }
 
-model1 <- buildthemodel(c(100, 2, 1))
-model2 <- buildthemodel(c(100,1,0.1))
+#D, theta, a, rho
+#model1 <- buildthemodel(c(100, 2, 1, 0.3))
+#model2 <- buildthemodel(c(50,1.5,0.1, 0.5))
+#model3 <- buildthemodel(c(80,1.9,0.4, 0.5))
+#model4 <- buildthemodel(c(100,1.7,0.9, 0.5))
+#model5 <- buildthemodel(c(100, 2, 0.5 , 0.5))
 
+bestmodel <- buildthemodel((c(9.4570985, 0.8363515, 0.4154285, 1.4099289)))
+bestmodel
