@@ -1,8 +1,7 @@
-#Script fot Bolker to run
+#Script for Bolker to run
 source("scripts/packages.R")
 source("scripts/sharedusersmatrix.R")
-source("scripts/weightedshareduserdf.R")
-
+source("scripts/weightedshareduserdf.R",echo=TRUE)
 #The data frame with the best parameters
 hessian <- read.csv("data/paramshessian.csv")
 hessian <- hessian[,-1]

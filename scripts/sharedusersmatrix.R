@@ -20,6 +20,8 @@ county.incidence.by.year <- mixedmodeldf %>% filter(county != "Lewis-Washington"
                                                       county != "Plumas-California") 
 
 source("scripts/wns-presence.R")
+grep("Le Haut.*Fr.*Qu.*",presence.df$county,value=TRUE)
+
 #Remove Cali and Wash for now
 uniq.df <- (presence.df
             %>% dplyr::filter(!STATEPROV %in% c("California","Washington"),
@@ -33,23 +35,47 @@ wns.center.coords <- cbind(wnslat, wnslon)
 
 d1 <- distm(wns.center.coords, fun = distGeo)
 dimnames(d1) <- list(uniq.df$county,uniq.df$county)
+grep("Le Haut.*Fr.*Qu.*",rownames(d1), value=TRUE)
+grep("Le Haut.*Fr.*Qu.*",colnames(d1), value=TRUE)
 
 diag(d1) <- 0 
 #convert from m to km
 d1 <- d1/1000
-bothcouties <- melt(d1)
-bothcounties <- bothcouties %>% dplyr::rename(county = Var1) %>% dplyr::rename(county2 = Var2) 
+bothcounties0 <- melt(d1)
+bothcounties <- bothcounties0 %>% dplyr::rename(county = Var1) %>% dplyr::rename(county2 = Var2) 
 head(bothcounties)
+unique(grep("Le Haut.*Fr.*Qu.*",bothcounties$county, value=TRUE))
+unique(grep("Le Haut.*Fr.*Qu.*",bothcounties$county2, value=TRUE))
 
-county.incidence.by.year[county.incidence.by.year == "La C\x99te-De-Gasp\x8e-Quebec"] <- 'La Côte-De-Gaspé-Quebec'
-county.incidence.by.year[county.incidence.by.year == "L'\x83rable-Quebec"] <- "L'Érable-Quebec"
-county.incidence.by.year[county.incidence.by.year == "Lotbini̬re-Quebec"] <- 'Lotbinière-Quebec'
-county.incidence.by.year[county.incidence.by.year == "Le Haut-Saint-Laurent-Qu̩bec"] <- 'Le Haut-Saint-Laurent-Québec'
-county.incidence.by.year[county.incidence.by.year == "Memphr̩magog-Quebec"] <- 'Memphrémagog-Quebec'
-county.incidence.by.year[county.incidence.by.year == "Le Haut-Saint-Fran\x8dois-Quebec"] <- 'Le Haut-Saint-François-Quebec'
-county.incidence.by.year[county.incidence.by.year == "Antoine-Labelle-Qu̩bec"] <- 'Antoine-Labelle-Québec'
-county.incidence.by.year[county.incidence.by.year == "La C̫te-de-Beaupr̩-Qu̩bec"] <- 'La Côte-de-Beaupré-Québec'
+unique(grep("Le Haut.*Fr.*Qu.*",county.incidence.by.year$county,value=TRUE,ignore.case=TRUE))
 
+badstr <- "Le Haut-Saint-Fran̤ois-Quebec"
+badletter <- substr(gsub(".*n","",badstr),1,1)
+charToRaw(badletter)
+charToRaw("̤")
+charToRaw("\x8d") ## Macintosh Latin character set
+
+matchtab <- read.table(sep="|", strip.white=TRUE,
+                       header=TRUE, quote="", text = "
+regex | replace
+La C.*te-De-Gasp.*-Quebec | La Côte-De-Gaspé-Quebec
+L'.*rable-Quebec | L'Érable-Quebec
+Lotbini.*re-Quebec | Lotbinière-Quebec
+Le Haut-Saint-Laurent-Qu.*bec | Le Haut-Saint-Laurent-Québec
+Memphr.*magog-Quebec | Memphrémagog-Quebec
+Le Haut-Saint-Fran.*ois-Quebec | Le Haut-Saint-François-Quebec
+Antoine-Labelle-Qu.*bec | Antoine-Labelle-Québec
+La C.*te-de-Beaupr.*-Qu.*bec | La Côte-de-Beaupré-Québec
+")
+
+for (i in 1:nrow(matchtab)) {
+    matches <- grepl(matchtab$regex[i], county.incidence.by.year$county)
+    cat("matched",sum(matches),"\n")
+    county.incidence.by.year$county[matches] <- matchtab$replace[i]
+}
+    
+bad <- anti_join(county.incidence.by.year, bothcounties, by="county")
+stopifnot(nrow(bad)==0)
 
 biglong <- left_join(county.incidence.by.year,bothcounties, by = "county")
 biglong2 <- left_join(biglong, shareuserlists, by = c("county", "county2","year"))
@@ -68,6 +94,9 @@ biglong2$num.shared <- replace(biglong2$num.shared, is.na(biglong2$num.shared), 
 
 ##This is a data frame that I want to take with me
 numbersharedcountiesusers <- biglong2 %>% dplyr::select(-c(X,incidence,id, value)) 
+
+numbersharedcountiesusers %>% dplyr::filter(grepl("Le Haut.*Fran.*Qu.*",
+                                                  county))
 
 write.csv(numbersharedcountiesusers, "data/numbersharedcountiesusers.csv")
 #yearone <- numbersharedcountiesusers %>% filter(year == 2008) %>%
