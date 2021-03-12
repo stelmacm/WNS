@@ -18,6 +18,7 @@ county.incidence.by.year <- mixedmodeldf %>% filter(county != "Lewis-Washington"
   dplyr::select(-yc)
 #This dataframe is OK. 
 
+## 
 #Only way I could figure it out is via
 countylist <- county.incidence.by.year %>%
   arrange(year) %>%
@@ -31,7 +32,9 @@ numbersharedcountiesusers <- read_csv("data/weightedshareduserdf.csv") %>%
 
 #test <- vroom("data/weightedsharedusers.csv") %>% dplyr:: select(-1) %>% mutate(year = factor(year))
 
-buildthemodel <- function(p) {
+buildthemodel <- function(p, return_value=c("nll","data")) {
+  return_value <- match.arg(return_value)
+  cat(p,"\n")
   ## unpack parameter vector, via link functions
   d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
   theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
@@ -61,7 +64,6 @@ buildthemodel <- function(p) {
       dplyr::select(incidence)
   }
   #view(countylist)
-  
   
   countylist <- as.data.frame(countylist[,-1])
   
@@ -125,9 +127,15 @@ buildthemodel <- function(p) {
   
   #Mixed model formula
   formula <- incidence ~ (1|year) + (1|county) + offset(log(previnf + a))
+
+  if (return_value=="data") return(list(form=formula,a=a, data=newdf))
   
-  foimm <- glmer(formula, data = newdf, family = binomial(link = "cloglog"))
-  
+  cat("before\n")
+  foimm <- try(glmer(formula, data = newdf, family = binomial(link = "cloglog")),
+             silent=TRUE)
+  cat("after\n")
+
+  if (inherits(foimm,"try-error")) return(NA_real_)
   optimalloglik <- logLik(foimm)
   return(optimalloglik)
   
@@ -144,11 +152,36 @@ linkfun <- function(p) c(p[1], qlogis(p[2]/2), log(p[3]), qlogis(p[4]))
 
 bestparams <- optim(par = linkfun(c(100, 1.5, .7, 0.5)), fn = buildthemodel, control=list(trace=1000),
                     hessian = TRUE)
+## error: cannot generate feasible simplex
 
 #This one start to work and runs the optim better than the above which means starting values matter alot? 
 #Eventually it still crashes @ c(9.06057739257812, -4.33280418319937, -7.99249410438807, 10.6374206542969)
 bestparams <- optim(par = linkfun(c(10,.5,.5,0.5)), fn = buildthemodel, control=list(trace=1000),
-                       hessian = TRUE)
+                    hessian = TRUE)
+## scale, power (logit), log-constant (log), rho (logit)
+
+dd <- buildthemodel(c(9.06057739257812, -4.33280418319937,
+                      -7.99249410438807, 10.6374206542969),
+                    return_val="data")
+
+a <- dd$a
+dat <- na.omit(dd$data)
+glmer(dd$form, data=dat, family=binomial(link="cloglog"),
+      control=glmerControl(nAGQ0initStep = FALSE))
+library(ggplot2)
+ggplot(dd$data, aes(previnf, incidence)) + stat_sum()
+length(unique(dd$data$previnf))
+min(dat$previnf)
+sum(dat$previnf==min(dat$previnf))
+hist(dat$previnf,breaks=100)
+plot(table(dat$previnf))
+length(unique(dat$previnf))
+lginf <- dat$previnf[dat$previnf>1e-4]
+plot(table(lginf))
+length(unique(lginf))
+length(lginf)
+hist(log10(dat$previnf[dat$previnf<1e-4]),breaks=50)
+
 
 listem <- function(q){
   scalingparam <- q[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
