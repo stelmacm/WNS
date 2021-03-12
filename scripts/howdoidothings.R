@@ -145,6 +145,16 @@ linkfun <- function(p) c(p[1], qlogis(p[2]/2), log(p[3]), qlogis(p[4]))
 bestparams <- optim(par = linkfun(c(100, 1.5, .7, 0.5)), fn = buildthemodel, control=list(trace=1000),
                     hessian = TRUE)
 
-#This one works and starts the optim which means starting values matter alot? 
+#This one start to work and runs the optim better than the above which means starting values matter alot? 
+#Eventually it still crashes @ c(9.06057739257812, -4.33280418319937, -7.99249410438807, 10.6374206542969)
 bestparams <- optim(par = linkfun(c(10,.5,.5,0.5)), fn = buildthemodel, control=list(trace=1000),
                        hessian = TRUE)
+
+listem <- function(q){
+  scalingparam <- q[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
+  tita <- plogis(q[2])*2  ## plogis -> [0,1], then double it for [0,2]
+  aa <- exp(q[3])
+  row <- plogis(q[4])
+  return(c(scalingparam, tita, aa, row))
+}
+
