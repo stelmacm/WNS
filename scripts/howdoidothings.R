@@ -152,4 +152,4 @@ bpbuild <- buildthemodel(linkfun(c(9.422264000, 0.030418512, 0.002313349, 0.9996
 #so I will do it manually
 #yikes
 source("scripts/errorwithlowestloglik.R") #foimm2
-
+#Basically the MLE happens when all the FOI is 0 or close to 0 which is not good because we need it to grow
