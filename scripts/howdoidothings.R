@@ -6,7 +6,8 @@
 
 #Looked into where we get the super crazy values from in optim.
 #Turns out the model does not even build. The reason for this (guessing) is
-#super small values for the force of infection. Putting control on glmer helps.
+#super small values for the a inside the log values for we have log(0). Putting control on glmer helps.
+
 
 #Finally when optim stops running I get this
 #Error in pwrssUpdate(pp, resp, tol = tolPwrss, GQmat = GHrule(0L), compDev = compDev,  : 
@@ -52,9 +53,10 @@ fig5
 
 #I think I just need to find this out manually and do another more precise for loop
 #Is changing glmerControl(tolPwrss=1e-5)) a viable solution worth going into
-
+source("scripts/packages.R")
 source("scripts/shorterbuildmodelandoptim.R")
 
+library(DEoptim)
 #What my DEoptim would be
 controlDE <- list(reltol=.000001,steptol=150, itermax = 500,trace = 250,
                    strategy=1, c=0,
@@ -66,5 +68,7 @@ attempt1 <- DEoptim(fn = buildthemodel, lower = (c(3,0.5,0.0001,0.01)), upper = 
 #This might not be the direction to go in. It would be nice to just get an answer for hyper params and move to the next
 #step or redo parts of the model that include shared users to make something that makes sense
 
+#Testing the bad values
+source("scripts/problematicvaluesforthemodel.R")
 
 
