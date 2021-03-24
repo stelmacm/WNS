@@ -51,6 +51,22 @@ fig5 <- plot_ly(
   ))
 fig5
 
+library(rgl)
+with(forloopsummary,
+     plot3d(rho,theta,-1*loglikelhood))
+
+thmax <- subset(forloopsummary, theta==max(theta))
+plot(-1*loglikelhood~rho, data=thmax)
+
+library(ggplot2); theme_set(theme_bw())
+print(ggplot(forloopsummary,
+             aes(rho, -1*loglikelhood,col=factor(a)))
+      + geom_point()
+      + geom_line(aes(group=interaction(a,dist)),
+                  colour="gray")
+      + facet_wrap(~theta)
+)
+
 #I think I just need to find this out manually and do another more precise for loop
 #Is changing glmerControl(tolPwrss=1e-5)) a viable solution worth going into
 source("scripts/packages.R")
