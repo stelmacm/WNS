@@ -65,10 +65,15 @@ foidf <- county.incidence.by.year %>% filter(year == 2010) %>%
 buildthemodel <- function(p) {
   ## unpack parameter vector, via link functions
   cat(p,"\n")
+  #d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
+  #theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
+  #a <- exp(p[3])           ## must be positive
+  #rho <- plogis(p[4])
+  
   d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
-  theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
-  a <- exp(p[3])           ## must be positive
-  rho <- plogis(p[4])
+  theta <- (p[2])  ## plogis -> [0,1], then double it for [0,2]
+  a <- (p[3])           ## must be positive
+  rho <- (p[4])
   #cutoffpoint <- (1/exp(p[4]))
   #cutoffpoint <- (1e-300)
   #Maybe just have to do it by hand
@@ -126,8 +131,8 @@ buildthemodel <- function(p) {
 
 linkfun <- function(p) c(p[1], qlogis(p[2]/2), log(p[3]), qlogis(p[4]))
 
-test1 <- buildthemodel(linkfun(c(10,.5,.1,.3)))
-test2 <- buildthemodel(linkfun(c(60,1.3,.01,.5)))
+#test1 <- buildthemodel(linkfun(c(10,.5,.1,.3)))
+#test2 <- buildthemodel(linkfun(c(60,1.3,.01,.5)))
 
 #Don't run
 #bestparams <- optim(par = linkfun(c(10,.5,.01,0.5)), fn = buildthemodel, control=list(trace=1000),hessian = TRUE)
@@ -141,14 +146,14 @@ listem <- function(q){
 }
 
 #On attempt one with LL of -1452.86 and param 10, .5, .01 , .5
-bp <- listem(c(5.624565, 3.228535, -6.105417, 7.515743))
-aa <- buildthemodel(linkfun(bp))
+#bp <- listem(c(5.624565, 3.228535, -6.105417, 7.515743))
+#aa <- buildthemodel(linkfun(bp))
 
 #In the extended version
-bp2 <- listem(c(9.422264, -4.170525, -6.069059, 7.979524))
-buildthemodel(linkfun(bp2))
+#bp2 <- listem(c(9.422264, -4.170525, -6.069059, 7.979524))
+#buildthemodel(linkfun(bp2))
 #Returns NA????
-bpbuild <- buildthemodel(linkfun(c(9.422264000, 0.030418512, 0.002313349, 0.999657715)))
+#bpbuild <- buildthemodel(linkfun(c(9.422264000, 0.030418512, 0.002313349, 0.999657715)))
 #so I will do it manually
 #yikes
-source("scripts/errorwithlowestloglik.R") #foimm2
+#source("scripts/errorwithlowestloglik.R") #foimm2
