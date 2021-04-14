@@ -1,208 +1,130 @@
-#New model with better stuff
+#All I am doing here is playing with power exponential and looking into what is the best way to do thing
 source("scripts/packages.R")
-#Another model builder but with weighted shared users already created
-#Take known data
-mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
-  as_tibble() %>%
-  mutate(year = factor(year))
 
+#Starting off by creating fake dataframe
+
+fakecounties <- (matrix(1, nrow = 3, ncol = 3, dimnames = list(c("NY","OKC","MAINE"), c("NY","OKC","MAINE"))))
+#Lets make the values the distance in KM
+fakecounties[1,2] <- 150
+fakecounties[2,1] <- 150
+fakecounties[1,3] <- 25
+fakecounties[3,1] <- 25
+fakecounties[2,3] <- 175
+fakecounties[3,2] <- 175
+diag(fakecounties) <- 0
+
+#first inve and then azzalini
+invcounty <- 1/fakecounties
+diag(invcounty) <- 0
+azz <- exp(- invcounty) #But then NY -> OKC has bigger prob than NY -> Maine 
+diag(azz) <- 0
+#Now to weight matrix
+#Can confirm weightmatrix will be the last thing done to this
+weight.w <- mat2listw(azz, style = "W")
+weight.m <- as(weight.w, "CsparseMatrix") 
+weight <- as.matrix(weight.m)
+weight #This results in NY -> Maine being smaller
+
+#first azzalini and then inverse??
+azzy <- exp(-fakecounties)
+inv2 <- 1/azzy #Farther counties have much greater weight 
+diag(inv2) <- 0
+
+weight.w2 <- mat2listw(inv2, style = "W")
+weight.m2 <- as(weight.w2, "CsparseMatrix") 
+weight2 <- as.matrix(weight.m2)
+weight2 #Lots of problems
+
+#Playing around
+#Trying something with coords and knn
+coords <- read.csv("data/latlonofcounty.csv")
+#Taking just long lat
+lonlat <- cbind(coords$lon, coords$lat)
+#Creating Knn to neighbors (just to start)
+k1 <- knn2nb(knearneigh(lonlat))
+
+critical.threshold <- max(unlist(nbdists(k1,lonlat)))
+critical.threshold
+
+nb.dist.band <- dnearneigh(lonlat, 0, critical.threshold)
+
+distances <- nbdists(nb.dist.band,lonlat)
+
+invd1 <- lapply(distances, function(x) (1/x))
+length(invd1) #OK 
+
+invd.weights <- nb2listw(nb.dist.band,glist = invd1,style = "B")
+plot(invd.weights, lonlat, lwd=.2, col="blue", cex = .5) #Cool network
+
+#Now doing the super basic can only go 6 neighbors over
+k6 <- knn2nb(knearneigh(lonlat, k = 6))
+k.distances <- nbdists(k6, lonlat)
+invd.weights.knn <- nb2listw(k6,glist = k.distances,style = "B")
+plot(invd.weights.knn, lonlat, lwd=.2, col="blue", cex = .5)
+#I guess you could say it is much emptier
+
+
+#Now going to create Gaussian kernal 
+kernal.nb <- dnearneigh(lonlat, 0, critical.threshold)
+kernalw.distances <- nbdists(kernal.nb, lonlat)
+#Gaussian
+gaussian.w <- lapply(kernalw.distances, function(x) sqrt(2*pi)*exp((-(x/critical.threshold)^2)/2))
+gaussian.weights <- nb2listw(kernal.nb,glist = gaussian.w,style = "B")
+
+plot(gaussian.weights, lonlat, lwd=.2, col="blue", cex = .5) #changed...
+
+#Now going to create Azzalini bubble from neighbors??? Going to replace critical threshold with old optim
+kernal.nbA <- dnearneigh(lonlat, 0, 9.5)
+kernalw.distancesA <- nbdists(kernal.nb, lonlat)
+#Gaussian
+azzalini.w <- lapply(kernalw.distancesA, function(x) exp((-(x/9.5)^0.5)))
+azzalini.weights <- nb2listw(kernal.nbA,glist = azzalini.w,style = "W")
+
+plot(azzalini.weights, lonlat, lwd=.2, col="blue", cex = .5) #LOL....
+
+
+#Curious now about the actual that I use
 distmat <- read.csv("data/distancematrix.csv")
 distmat2 <- distmat[,-1]
 rownames(distmat2) <- colnames(distmat2)
 d1 <- as.matrix(distmat2)
 diag(d1) <- 0 
-#I am a CLOWN. INVERSE Dist mat
+#INVERSE
 d1 <- 1/d1
 diag(d1) <- 0
-#only keeping it same name bc I missed where it is used in function the first time
+#No Azzalini
+localcountymat.w <- mat2listw(d1, style = "W")
+plot(localcountymat.w, lonlat, lwd=.2, col="blue", cex = .5) #I don't know what I expected.
+
+#Now trying cutoff
+d1[d1 < 0.005] <- 0
+smallcounty <- mat2listw(d1, style = "W")
+plot(smallcounty, lonlat, lwd=.2, col="blue", cex = .5) #I don't know what I expected.
+#seems much more realistic. Hard cut off still seems meh
+
+#Now azzalini (might as well do it with what we have)
+aaazzz <- exp(- abs(d1/9.5)^0.5)
+aaazzz[aaazzz == 1] <- 0
+diag(aaazzz) <- 0
+
+azzalinicounty <- mat2listw(aaazzz, style = "W")
+plot(azzalinicounty, lonlat, lwd=.2, col="blue", cex = .5) #Better I guess
 
 
-numbersharedcountiesusers <- read_csv("data/weightedshareduserdf.csv") %>%
-  mutate(year = factor(year)) %>% dplyr::select(-X1)
+#Now with optim Azzalini param
+#The key here is that the optim wants to break the matrix
+azzy <- exp(-abs(d1/6e-6)^0.5)
+azzy[azzy == 1] <- 0
+#Connect it
+azzycounty <- mat2listw(azzy, style = "W")
+plot(azzycounty, lonlat, lwd=.2, col="blue", cex = .5) #Why did this work now??
+#I actually cant tell the difference between this and the other one
+#did I just freak out over nothing???
 
-#test <- vroom("data/weightedsharedusers.csv") %>% dplyr:: select(-1) %>% mutate(year = factor(year))
-#Pulling this out of for loop
-incidencedata <- (read.csv("data/incidencepercounty.csv"))%>%
-  dplyr::select(county, year, incidence) %>%
-  mutate(year = factor(year))
-
-county.incidence.by.year <- mixedmodeldf %>% filter(county != "Lewis-Washington" &
-                                                      county != "King-Washington" &
-                                                      county != "Plumas-California") %>%
-  dplyr::select(-c(yc,id)) %>% arrange(county)
-
-countylist <- list()
-#Can't have county incidence by year bc that makes no sense
-for(i in levels(mixedmodeldf$year)){
-  countylist[[i]] <- county.incidence.by.year %>%
-    filter(year == i) %>% dplyr::select(-c(county,year))
-}
-
-sharedusersperyear <- list()
-for (i in levels(mixedmodeldf$year)) {
-  #Could ultimately do this outside of for loop since its always constant and have a list of vectors inside
-  sharedusersperyear[[i]] <- (numbersharedcountiesusers %>% filter(year == i) %>%
-                                dplyr::select(-year))
-}
-
-sharedmatrix <- list()
-sharedusers <- list()
-for (i in levels(mixedmodeldf$year)){
-  #perfect
-  sharedmatrix[[i]] <- dcast(sharedusersperyear[[i]], county ~ county2, value.var = "num.shared")
-  #Works because 1st column is names is row 1
-  removingcounty <- sharedmatrix[[i]]
-  sharedusers[[i]] <- removingcounty[,-1]
-}
-
-foidf <- county.incidence.by.year %>% filter(year == 2010) %>%
-  dplyr::select(county)
-
-#Thoughts:
-#The only thing that really has to be built in the optim model is the weight matrix and the glmm. Everything else cant be built outside
-#Should build so that all we need to do is create local.county.m and multiply it by shared useds and incidence
-#to create foi df to use in glmm
-
-
-buildthemodel <- function(p) {
-  ## unpack parameter vector, via link functions
-  cat(p,"\n")
-  d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
-  theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
-  a <- exp(p[3])           ## must be positive
-  rho <- plogis(p[4])
-  #cutoffpoint <- (1/exp(p[4]))
-  #cutoffpoint <- (1e-300)
-  #Maybe just have to do it by hand
-  azzelinifun <- exp(-((d1)/d)^theta)
-  diag(azzelinifun) <- 0
-  #azzelinifun[(azzelinifun < cutoffpoint)] <- 0
-  
-  #Now to weight matrix
-  localcountymat.w <- mat2listw(azzelinifun, style = "W")
-  localcountymat.m <- as(localcountymat.w, "CsparseMatrix") 
-  localcountymat <- as.matrix(localcountymat.m)
-  #Order the matrix so multiplication makes sense
-  orderedmat <- localcountymat[sort(rownames(localcountymat)),sort(colnames(localcountymat))]
-  
-  #Multiply the matrices
-  for (i in levels(mixedmodeldf$year)){
-    #Maths
-    userstimeslocation <- rho*as.matrix(sharedusers[[i]]) + (1-rho)*orderedmat
-    #multiply W_ij %*% I_t
-    foivector <- userstimeslocation %*% as.matrix(countylist[[i]])
-    #reattach
-    foidf[,i] <- foivector
-  }
-  
-  #The melt looks something like this
-  forceofinfectiondf <- reshape2::melt(foidf, id = "county") %>%
-    dplyr::rename(year = 'variable', foi = 'value') %>%
-    arrange(county) %>%
-    mutate(year = factor(year))
-  #Never arranged alphabetically before. odd 
-  
-  modeldataframe <- left_join(forceofinfectiondf, incidencedata, by = c("county","year")) %>%
-    mutate(previousyear=lag(incidence)) %>%
-    filter(year != "2006") #Maybe there are nicer ways to do this. oh well
-  
-  modeldataframe$year <- factor(modeldataframe$year)
-  modeldataframe$previnf <- (lag(modeldataframe$foi))
-  
-  #So problem with mixed modeldf is that the years continue once incidence has 
-  #occered. So it is redundant.
-  
-  #Changing to disappear after incidence occures
-  newdf <- modeldataframe %>% subset((incidence == 0) | (incidence == 1 & previousyear == 0))
-  
-  #Mixed model formula
-  formula <- incidence ~ (1|year)  +  (1|county) + offset(log(previnf + a))
-  
-  foimm <- try(glmer(formula, data = newdf, family = binomial(link = "cloglog")),
-               silent=TRUE)
-  
-  if (inherits(foimm,"try-error")) return(NA_real_)
-  optimalloglik <- logLik(foimm)
-  #return(optimalloglik)
-  return(foimm)
-}
-
-linkfun <- function(p) c(p[1], qlogis(p[2]/2), log(p[3]), qlogis(p[4]))
-
-#Where optim ran out of iterations 
-#d = 5.43, theta = 1.89, a(offset) = 0.006, rho = 0.904
-nearlowestloglik <- buildthemodel((c(5.435672,2.9937222,-7.295313,2.251913)))
-
-#Check out figures/IDWforloopLL.png
-
-#Checked out shared users only model with the fixed mistake and it doesn't look
-#nice due to sparcity.
-#Still want to run optims for variations of models but so far looks 
-#only okay and promising
-
-
-#Model 2
-modelwithnoyear <- function(p) {
-  ## unpack parameter vector, via link functions
-  cat(p,"\n")
-  d <- p[1]   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
-  theta <- plogis(p[2])*2  ## plogis -> [0,1], then double it for [0,2]
-  a <- exp(p[3])           ## must be positive
-  rho <- plogis(p[4])
-  #cutoffpoint <- (1/exp(p[4]))
-  #cutoffpoint <- (1e-300)
-  #Maybe just have to do it by hand
-  azzelinifun <- exp(-((d1)/d)^theta)
-  diag(azzelinifun) <- 0
-  #azzelinifun[(azzelinifun < cutoffpoint)] <- 0
-  
-  #Now to weight matrix
-  localcountymat.w <- mat2listw(azzelinifun, style = "W")
-  localcountymat.m <- as(localcountymat.w, "CsparseMatrix") 
-  localcountymat <- as.matrix(localcountymat.m)
-  #Order the matrix so multiplication makes sense
-  orderedmat <- localcountymat[sort(rownames(localcountymat)),sort(colnames(localcountymat))]
-  
-  #Multiply the matrices
-  for (i in levels(mixedmodeldf$year)){
-    #Maths
-    userstimeslocation <- rho*as.matrix(sharedusers[[i]]) + (1-rho)*orderedmat
-    #multiply W_ij %*% I_t
-    foivector <- userstimeslocation %*% as.matrix(countylist[[i]])
-    #reattach
-    foidf[,i] <- foivector
-  }
-  
-  #The melt looks something like this
-  forceofinfectiondf <- reshape2::melt(foidf, id = "county") %>%
-    dplyr::rename(year = 'variable', foi = 'value') %>%
-    arrange(county) %>%
-    mutate(year = factor(year))
-  #Never arranged alphabetically before. odd 
-  
-  modeldataframe <- left_join(forceofinfectiondf, incidencedata, by = c("county","year")) %>%
-    mutate(previousyear=lag(incidence)) %>%
-    filter(year != "2006") #Maybe there are nicer ways to do this. oh well
-  
-  modeldataframe$year <- factor(modeldataframe$year)
-  modeldataframe$previnf <- (lag(modeldataframe$foi))
-  
-  #So problem with mixed modeldf is that the years continue once incidence has 
-  #occered. So it is redundant.
-  
-  #Changing to disappear after incidence occures
-  newdf <- modeldataframe %>% subset((incidence == 0) | (incidence == 1 & previousyear == 0))
-  
-  #Mixed model formula
-  formula <- incidence ~ (1|county) + offset(log(previnf + a))
-  
-  foimm <- try(glmer(formula, data = newdf, family = binomial(link = "cloglog")),
-               silent=TRUE)
-  
-  if (inherits(foimm,"try-error")) return(NA_real_)
-  optimalloglik <- logLik(foimm)
-  #return(optimalloglik)
-  return(foimm)
-}
-
-testmodel2pt3 <- modelwithnoyear(linkfun(c(15,1.9,.01,.5)))
+#Trying to get a better view of azzy
+orderedazzy <- azzy[sort(rownames(azzy)),sort(colnames(azzy))]
+#So problem is still occuring...
+#Adair OK -> Cherokee OK 34 miles
+#Adair OK -> Cheroke Kansas 81 miles
+#But in the matrix the greater distance has a larger weight put on it
+#This is not what I want. No beuno.
