@@ -1,5 +1,5 @@
 #QUESTIONS:
-#-Starting in sandbox.cpp how do I get a list of matrices into C++. This is the example from the TMB website but it keeps crashing
+#-Starting in sandbox.cpp (R side is called sandboxRside.R), how do I get a list of matrices into C++. This is the example from the TMB website but it keeps crashing
 #-Is this even the right approach? Do I wanted to have a list of matrices and then build the model as I normally would or should I do other things
 #-How does one actually make a 'mixed model' in TMB. It is a bit unclear from their tutorials and examples.
 #-I at one point need to 'melt' and 'left_join'. Melt I can probably do with a for loop by I became stuck with left_join
