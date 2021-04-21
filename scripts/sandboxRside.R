@@ -1,7 +1,7 @@
 #Sandbox for TMB
 #Going to try to bring in a list of a list
 library(TMB)
-library(Matrix)
+## library(Matrix)
 
 
 data <- list()
@@ -9,8 +9,14 @@ data$object <- list(a=1:3, b=matrix(1:9,3))
 obj <- MakeADFun(data,........) 
 
 parameters <- list(pp = rnorm(1))
+parameters <- list(q=2)
 #This is what would be needed to run in
 compile("scripts/sandbox.cpp")
 dyn.load(dynlib("scripts/sandbox"))
-obj <- MakeADFun(data = data, parameters, DLL="sandbox")
+obj <- MakeADFun(data = data, parameters=parameters, DLL="sandbox")
 
+lapply(
+    yearvec,
+    function(y) {
+        sparse.model.matrix(~county-1, data=subset(all_data,year==y))
+    })

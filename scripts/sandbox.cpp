@@ -16,8 +16,13 @@ struct my_list {
 template<class Type>
 Type objective_function<Type>::operator() ()
 {
+
+  PARAMETER(q);
   DATA_STRUCT(object, my_list);
+  
   REPORT(object.a); // Now you can use "a" and "b" as you like
   REPORT(object.b);
-  return 0;
+
+  Type jnll=pow(q,2.0);
+  return(jnll);
 }
