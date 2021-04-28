@@ -5,21 +5,6 @@ mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
   as_tibble() %>%
   mutate(year = factor(year))
 
-#import and create distance matrix
-distmat <- read.csv("data/distancematrix.csv")
-distmat2 <- distmat[,-1]
-rownames(distmat2) <- colnames(distmat2)
-d1 <- as.matrix(distmat2)
-diag(d1) <- 0 
-#Removing cut off for now
-#Going to order d1 matrix so I dont have in C code.
-orderedmat <- d1[sort(rownames(d1)),sort(colnames(d1))]
-
-
-#import already weighted matrix of shared users
-numbersharedcountiesusers <- read_csv("data/weightedshareduserdf.csv") %>%
-  mutate(year = factor(year)) %>% dplyr::select(-X1)
-
 #Pulling this out of for loop
 incidencedata <- (read.csv("data/incidencepercounty.csv"))%>%
   dplyr::select(county, year, incidence) %>%
@@ -30,12 +15,34 @@ county.incidence.by.year <- mixedmodeldf %>% filter(county != "Lewis-Washington"
                                                       county != "Plumas-California") %>%
   dplyr::select(-c(yc,id)) %>% arrange(county)
 
-countylist <- list()
-#Can't have county incidence by year bc that makes no sense
+uninfectedcounties <- county.incidence.by.year 
+uninfectedcounties$uninfected <- 0
+
+uninfectedcounties$uninfected[uninfectedcounties$incidence == 0] <- 1
+
+uninfectedcounties <- uninfectedcounties %>% filter(year!= 2006)
+
+uninfectedcountylist <- as.vector(uninfectedcounties$uninfected)
+
+#TRYING SOMETHING OUT
+countylist <- county.incidence.by.year %>%
+  filter(year == 2006) %>%
+  dplyr::select(county)
+
 for(i in levels(mixedmodeldf$year)){
-  countylist[[i]] <- county.incidence.by.year %>%
-    filter(year == i) %>% dplyr::select(-c(county,year))
+  countylist[,i] <- county.incidence.by.year %>%
+    arrange(year) %>%
+    filter(year == i) %>%
+    dplyr::select(incidence)
 }
+
+countylist <- countylist %>% dplyr::select(-county)
+countylist <- as.matrix(countylist) #This is the incidence I am taking with me to TMB
+
+#Now creating shared users mat
+#import already weighted matrix of shared users
+numbersharedcountiesusers <- read_csv("data/weightedshareduserdf.csv") %>%
+  mutate(year = factor(year)) %>% dplyr::select(-X1)
 
 sharedusersperyear <- list()
 for (i in levels(mixedmodeldf$year)) {
@@ -54,5 +61,88 @@ for (i in levels(mixedmodeldf$year)){
   sharedusers[[i]] <- removingcounty[,-1]
 }
 
+#13 levels
+bigsharedusers <- cbind(sharedusers[[1]], sharedusers[[2]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[3]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[4]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[5]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[6]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[7]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[8]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[9]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[10]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[11]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[12]])
+bigsharedusers <- cbind(bigsharedusers, sharedusers[[13]])
+#write.csv(bigsharedusers, "data/bigsharedusers.csv")
+bigsharedusers <- as.matrix(bigsharedusers) #This is the shared users I want for TMB
+
+#Also taking the classic d1 mat
+#import and create distance matrix
+distmat <- read.csv("data/distancematrix.csv")
+distmat2 <- distmat[,-1]
+rownames(distmat2) <- colnames(distmat2)
+d1 <- as.matrix(distmat2)
+diag(d1) <- 0 
+#Removing cut off for now
+#Going to order d1 matrix so I dont have in C code.
+orderedmat <- d1[sort(rownames(d1)),sort(colnames(d1))]
+
+
+localcountymat.w <- mat2listw(d1, style = "W")
+localcountymat.m <- as(localcountymat.w, "CsparseMatrix") 
+localcountymat <- as.matrix(localcountymat.m)
+#Order the matrix so multiplication makes sense
+orderedmat <- localcountymat[sort(rownames(localcountymat)),sort(colnames(localcountymat))]
+
+rho <- .5
+
+countyinalist <- list()
+#Can't have county incidence by year bc that makes no sense
+for(i in levels(mixedmodeldf$year)){
+  countyinalist[[i]] <- county.incidence.by.year %>%
+    filter(year == i) %>% dplyr::select(-c(county,year))
+}
+
 foidf <- county.incidence.by.year %>% filter(year == 2010) %>%
   dplyr::select(county)
+
+#Multiply the matrices
+for (i in levels(mixedmodeldf$year)){
+  #Maths
+  userstimeslocation <- rho*as.matrix(sharedusers[[i]]) + (1-rho)*orderedmat
+  #multiply W_ij %*% I_t
+  foivector <- userstimeslocation %*% as.matrix(countyinalist[[i]])
+  #reattach
+  foidf[,i] <- foivector
+}
+
+#The melt looks something like this
+forceofinfectiondf <- reshape2::melt(foidf, id = "county") %>%
+  dplyr::rename(year = 'variable', foi = 'value') %>%
+  arrange(county) %>%
+  mutate(year = factor(year))
+#Never arranged alphabetically before. odd 
+
+modeldataframe <- left_join(forceofinfectiondf, incidencedata, by = c("county","year")) %>%
+  mutate(previousyear=lag(incidence))
+#Maybe there are nicer ways to do this. oh well
+
+modeldataframe$year <- factor(modeldataframe$year)
+modeldataframe$previnf <- (lag(modeldataframe$foi))
+
+#So problem with mixed modeldf is that the years continue once incidence has 
+#occered. So it is redundant.
+
+#Changing to disappear after incidence occures
+newdf <- modeldataframe %>% subset((incidence == 0) | (incidence == 1 & previousyear == 0)) %>%
+  filter(year != 2006)
+
+#These are my variables into the TMB world
+counties <- as.factor(newdf$county) #I dont think I want this as a factor but I'm unsure what else to do with it
+years <- as.factor(newdf$year)
+fixed_vec <- rep(0, length(newdf))
+random_vec <- rep(0,length(newdf))
+random_vec2 <- rep(0,length(newdf))
+incidence <- as.vector(newdf$incidence)
+
