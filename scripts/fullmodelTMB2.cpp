@@ -64,6 +64,8 @@ Type objective_function<Type>::operator() ()
   //matrix<Type> FOI(dim, numberofyears);
   vector<Type> FOI; //Uninitialized vector. Scary. DO SOMETHING ABOUT THIS
   for(int i = 0; i < numberofyears; i++){
+	  // BMB: only go as far as i < numberofyears-1?
+	  // (we don't need to calculate FOI for the last year ...
     //Extracting shared users for a given year LOOK INTO BLOCK ARGUEMENTS AGAIN
     matrix<Type> currentsharedusers = SM.block(0 , i*dim, dim , dim); //Block from 0th row 548*(i-1) col taking 548 row and 548 col
     //Block starting at (0,0) taking 548 rows, 548 cols
@@ -73,6 +75,25 @@ Type objective_function<Type>::operator() ()
     matrix<Type> incidenceofyear = countylist.block(0, i, dim, 1); //block from 0th row and ith col taking 548 row and just that col. 
     //Does this only make 12 col instead of 13???
     matrix<Type> FOIforayear = suplusdist * incidenceofyear;
+    // BMB
+
+    //   incidenceofnextyear = countylist.block(0, i+1, ...)
+    //    for (int j = 0; j < numberofcounties; j++) {
+    //       if (county(j) already infected in year i -> skip to next iteration
+    //         (i.e. if (incidenceofyear(j,0)==1))
+    //       otherwise ...
+    //        calculate log-likelihood of incidenceofnextyear(j) given FOIforayear(j,0)
+    //    linearpred = FOIforayear(j,0) + Randomeffectone(i) + Randomeffecttwo(j)
+    //    prob = invcloglog(linearpred)
+    //    nll -= dbinom(incidenceofnextyear(j), 1, prob, true) or whatever
+    //        and subtract from the running nll counter
+
+    //  you can dbinom(..., prob=invcloglog(linearpred)
+    // OR
+    //          dbinom_robust(..., prob=glmmtmb::logit_invcloglog(linearpred))
+    // penalizations OUTSIDE OF LOOP
+    //  can steal code from https://github.com/glmmTMB/glmmTMB/blob/master/glmmTMB/src/distrib.h#L186-L214 if you want 
+    
     //Makes sense so far
     //FAKE REVELATION: I can use STD libarary
     vector<Type> FOIplaceholder = (FOIforayear.col(0));
@@ -123,7 +144,8 @@ Type objective_function<Type>::operator() ()
   
   // fixed-effects (Still need to do offset param)
   vector<Type> logit = log(finalFOI + a);
-  
+
+  // BMB do all of this stuff one county/year at a time
   // add random effects to predictor
   logit += (yearindicator * Random_vectorone);
   logit += (countyindicator * Random_vectortwo); //Do I need 2 random vectors? Or just 1
