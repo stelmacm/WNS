@@ -1,4 +1,30 @@
 #include <TMB.hpp>
+extern "C" {
+  /* See 'R-API: entry points to C-code' (Writing R-extensions) */
+  double Rf_logspace_sub (double logx, double logy);
+  void   Rf_pnorm_both(double x, double *cum, double *ccum, int i_tail, int log_p);
+}
+/* y(x) = logit_invcloglog(x) := log( exp(exp(x)) - 1 ) = logspace_sub( exp(x), 0 )
+ y'(x) = exp(x) + exp(x-y) = exp( logspace_add(x, x-y) )
+ */
+TMB_ATOMIC_VECTOR_FUNCTION(
+  // ATOMIC_NAME
+  logit_invcloglog
+  ,
+  // OUTPUT_DIM
+  1,
+  // ATOMIC_DOUBLE
+  ty[0] = Rf_logspace_sub(exp(tx[0]), 0.);
+,
+// ATOMIC_REVERSE
+px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
+)
+  template<class Type>
+  Type logit_invcloglog(Type x) {
+    CppAD::vector<Type> tx(1);
+    tx[0] = x;
+    return logit_invcloglog(tx)[0];
+  }
 template<class Type>
 Type objective_function <Type>::operator() () {
   //Import data
@@ -12,6 +38,11 @@ Type objective_function <Type>::operator() () {
   PARAMETER(d);
   PARAMETER(theta);
   PARAMETER(rho);
+  PARAMETER_VECTOR(YearRandomEffect);
+  PARAMETER_VECTOR(CountyRandomEffect);
+  
+  Type nll = 0.0;
+  Type silly = 1.0;
   
   //Begin my applying azzalini parameter
   matrix<Type> azzalinimat(dim, dim);
@@ -47,7 +78,7 @@ Type objective_function <Type>::operator() () {
   matrix<Type> FOImat(dim,numberofyears);
   FOImat.setZero();
   vector<Type> FOI(dim*numberofyears);
-  for(int i = 0; i < numberofyears; i++){
+  for(int i = 0; i < (numberofyears - 1); i++){
     //Extracting shared users for a given year LOOK INTO BLOCK ARGUEMENTS AGAIN
     matrix<Type> currentsharedusers = SM.block(0 , i*dim, dim , dim); //Block from 0th row 548*(i-1) col taking 548 row and 548 col
     //Block starting at (0,0) taking 548 rows, 548 cols
@@ -58,56 +89,28 @@ Type objective_function <Type>::operator() () {
     matrix<Type> FOIforayear = suplusdist * incidenceofyear;
     //Makes sense so far
     //FAKE REVELATION: I can use STD libarary
-    FOI.col(i) = (FOIforayear.col(0));
+    //FOI.col(i) = (FOIforayear.col(0));
+    
+    matrix<Type> incidenceofnextyearmatrix = fullcountyincidence.block(0, i + 1, dim, 1);
+    vector<Type> incidenceofnextyearvec = incidenceofnextyearmatrix.col(0);
+    for(int j = 0; j < dim; j++){
+      if(fullcountyincidence(j,i) == 0){
+        Type linearpred = FOIforayear(j,0) + YearRandomEffect(i) + CountyRandomEffect(j);
+        Type prob = logit_invcloglog(linearpred);
+        Type incidenceofnextyear = incidenceofnextyearvec(j);
+        //incidenceofnextyear = countylist.block(0, i+1, ...)
+        nll -= dbinom(incidenceofnextyear, silly, prob, true);
+      }
+    }
   }
   
-  //Did this inside of for loop but it would crash R upon further inspection
-  vector<Type> foipt1(dim*2);
-  foipt1 << FOI.col(0), FOI.col(1);
+
+  nll -= sum(dnorm(YearRandomEffect, Type(0), Type(1), true));
+  nll -= sum(dnorm(CountyRandomEffect, Type(0), Type(1), true));
+
+  // Priors mean changing 
+  //nll -= dnorm()
+  //nll -= dnorm()
   
-  vector<Type> foipt2(dim*3);
-  foipt2 << foipt1, FOI.col(2);
-  
-  vector<Type> foipt3(dim*4);
-  foipt3 << foipt2, FOI.col(3);
-  
-  vector<Type> foipt4(dim*5);
-  foipt4 << foipt3, FOI.col(4);
-  
-  vector<Type> foipt5(dim*6);
-  foipt5 << foipt4, FOI.col(5);
-  
-  vector<Type> foipt6(dim*7);
-  foipt6 << foipt5, FOI.col(6);
-  
-  vector<Type> foipt7(dim*8);
-  foipt7 << foipt6, FOI.col(7);
-  
-  vector<Type> foipt8(dim*9);
-  foipt8 << foipt7, FOI.col(8);
-  
-  vector<Type> foipt9(dim*10);
-  foipt9 << foipt8, FOI.col(9);
-  
-  vector<Type> foipt10(dim*11);
-  foipt10 << foipt9, FOI.col(10);
-  
-  vector<Type> foipt11(dim*12);
-  foipt11 << foipt10, FOI.col(11);
-  
-  vector<Type> foipt12(dim*13);
-  foipt12 << foipt11, FOI.col(12);
-  
-  //Now need to lag FOI
-  //Not sure if there is a nice way to do this so
-  //This breaks TMB
-  vector<Type> laggedFOI(foipt12.size() + 1);
-  laggedFOI.setZero();
-  for(int i = 0; i < foipt12.size(); i++){
-    laggedFOI[i + 1] = foipt12[i];
-  }
-  
-  Type randomval = sum(laggedFOI);
-  
-  return randomval;
+  return nll;
 }
