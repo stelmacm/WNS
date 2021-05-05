@@ -1,7 +1,7 @@
 #BMB meeting May 5
 
 library(TMB)
-source("scripts/creatingfunctiondf.R")
+source("modeltesting/creatingfunctiondf.R")
 compile("scripts/stepbystepTMBmodel.cpp")
 dyn.load(dynlib("scripts/stepbystepTMBmodel"))
 countyeffect = rep(0,548)
@@ -9,9 +9,10 @@ yeareffect = rep(0,13)
 dparam = 50
 thetaparam = 1.4
 rhoparam = 0.6
+a = 0.001
 dd <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13, 
            fullcountyincidence = countylist)
-pp <- list(d = dparam, theta = thetaparam, rho = rhoparam, YearRandomEffect = yeareffect, CountyRandomEffect = countyeffect)
+pp <- list(d = dparam, theta = thetaparam, rho = rhoparam,  offsetparam = a,YearRandomEffect = yeareffect, CountyRandomEffect = countyeffect)
 
 obj <- MakeADFun(dd, pp, DLL="stepbystepTMBmodel") 
 #Problem occurs when
