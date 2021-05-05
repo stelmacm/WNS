@@ -35,22 +35,30 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     DATA_MATRIX(fullcountyincidence);
     
     //Import Parameters
-    PARAMETER(d);
+    PARAMETER(log_d);
     PARAMETER(theta);
-    PARAMETER(rho);
-    PARAMETER(offsetparam);
+    PARAMETER(logit_rho);
+    PARAMETER(log_offsetparam);
+    PARAMETER(logsd_Year);
+    PARAMETER(logsd_County);
     PARAMETER_VECTOR(YearRandomEffect);
     PARAMETER_VECTOR(CountyRandomEffect);
     
     Type nll = 0.0;
     Type silly = 1.0;
+
+    // apply inverse link functions
+    Type d = exp(log_d);
+    Type rho = invlogit(logit_rho);
+    Type offsetparam = exp(log_offsetparam);
     
     //Begin my applying azzalini parameter
     matrix<Type> azzalinimat(dim, dim);
     azzalinimat.setZero();
     for(int i = 0; i < dim; i++){
       for(int j=0; j < dim; j++){
-        Type currentval = dist(i,j);
+	// do we need these defs? substitute directly into azzalinimat() calc?
+        Type currentval = dist(i,j); 
         Type hyperparam = -1* pow(currentval/d , theta);
         azzalinimat(i,j) = hyperparam;
       }
@@ -80,7 +88,7 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     FOImat.setZero();
     vector<Type> FOI(dim*numberofyears);
     for(int i = 0; i < (numberofyears - 1); i++){
-      //Extracting shared users for a given year LOOK INTO BLOCK ARGUEMENTS AGAIN
+      //Extracting shared users for a given year LOOK INTO BLOCK ARGUMENTS AGAIN
       matrix<Type> currentsharedusers = SM.block(0 , i*dim, dim , dim); //Block from 0th row 548*(i-1) col taking 548 row and 548 col
       //Block starting at (0,0) taking 548 rows, 548 cols
       
@@ -99,17 +107,21 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
           Type individFOIforayear = FOIforayear(j,0);
           Type logFOIforayear = log(individFOIforayear + offsetparam);
           Type linearpred = logFOIforayear + YearRandomEffect(i) + CountyRandomEffect(j);
-          Type prob = logit(linearpred);
-          Type incidenceofnextyear = incidenceofnextyearvec(j);
+          Type logit_prob = logit_invcloglog(linearpred);
+          Type incidenceofnextyear = incidenceofnextyearvec(j);  // unnecessary/merge into nll calc?
           //incidenceofnextyear = countylist.block(0, i+1, ...)
-          nll -= dbinom_robust(incidenceofnextyear, silly, prob, true);
+          nll -= dbinom_robust(incidenceofnextyear, Type(1.0), logit_prob, true);
         }
       }
     }
     
-    
-    nll -= sum(dnorm(YearRandomEffect, Type(0), Type(1), true));
-    nll -= sum(dnorm(CountyRandomEffect, Type(0), Type(1), true));
+    // technical issue, when we get to Stan-world, that it's better to make the random effects UNSCALED
+    // (i.e. random effects are N(0,1), we multiply by sd before adding them to the linear predictor
+    // rather than SCALED (i.e. random effects are N(0,sd), we add them directly to the LP)
+    // ... we may want to leave these as N(0,1)
+    // we could ADREPORT() a scaled version of the random effects, for convenience
+    nll -= sum(dnorm(YearRandomEffect, Type(0), exp(logsd_Year), true));
+    nll -= sum(dnorm(CountyRandomEffect, Type(0), exp(logsd_County), true));
     
     // Priors mean changing 
     //nll -= dnorm()
