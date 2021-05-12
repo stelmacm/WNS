@@ -1,12 +1,12 @@
-library(TMB)
 source("scripts/creatingfunctiondf.R")
+library(TMB)
 compile("scripts/stepbystepTMBmodel.cpp")
 dyn.load(dynlib("scripts/stepbystepTMBmodel"))
 countyeffect = rep(0,548)
 yeareffect = rep(0,13)
 dparam = 50
 thetaparam = 1.4
-rhoparam = 0.6
+rhoparam = 0.6  
 
 a <- 0.001
 dd <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
@@ -19,50 +19,75 @@ obj <- MakeADFun(data=dd, parameters=pp, DLL="stepbystepTMBmodel",
                  silent=TRUE,
                  random=c("YearRandomEffect","CountyRandomEffect"))
 
+
 opt2 <- with(obj, nlminb(start = par, obj = fn, gr=gr,
                          control=list(trace=10)))
+#LL of 967.19
 
-## try with BFGS instead
-opt3 <- optim( par = obj$par,fn = obj$fn, gr = obj$gr, method = "BFGS", control=list(trace=TRUE))
-## start from nlminb optimum
-opt3B <- optim( par = opt2$par, fn = obj$fn, gr = obj$gr, method = "BFGS", control=list(trace=TRUE))
+#Post Monday Meeting  with BMB
+#Runnning his adjustments to see if they get the same results
 
-## ... and vice versa (start nlminb from BFGS optimum)
-opt2B <- with(obj, nlminb(start=opt3$par, objective=fn, gr=gr, control=list(trace=10)))
+compile("scripts/BMBTMB.cpp")
+dyn.load(dynlib("scripts/BMBTMB"))
 
-ee <- obj$env
-obj$fn(ee$last.par.best)
-with(ee,last.par.best[-random])
-## this *should* generate a nice table of coefficients and standard deviations
-library(broom.mixed)
-class(obj) <- "TMB"
-tidy(obj, effect="fixed", conf.int=TRUE) ## Wald confidence intervals
-tidy(obj, effect="fixed", conf.int=TRUE, conf.method="uniroot")
 
-head(obj$env$last.par.best)
 
-lpb <- obj$env$last.par.best
-lpb2 <- lpb
-delta_d_vec <- seq(-5,5,by=0.1)
-llvals <- sapply(delta_d_vec, function(x) { lpb2[1] <- lpb[1]+x; obj$fn(lpb2) })
+obj2 <- MakeADFun(data=dd, parameters=pp, DLL="BMBTMB",
+                 silent=TRUE,
+                 random=c("YearRandomEffect","CountyRandomEffect"))
 
-## compute likelihood profile rather than Wald confidence intervals
-tmbprofile(obj,name=1)
+optBMB <- with(obj2, nlminb(start = par, obj = fn, gr=gr,
+                         control=list(trace=10)))
 
-#Still no bueno
-#I know the problem is
-#https://stackoverflow.com/questions/35757048/initial-value-in-vmmin-is-not-finite-even-when-changing-the-starting-value
-#but this works if I were to use logit scale instead of cloglog so like why is there not enough param rooms
+opt2BMB <- optim(par = optBMB$par, fn = obj2$fn, gr = obj2$gr, method = "BFGS", control=list(trace=TRUE))
+#Oh.... ??? LL = 978.865
 
-#Alternatively, when I do get answers using logit, mostly the random effects vectors change and the scaling parameters dont change by much
-#in the logit model
+opt3BMB <- with(obj2, nlminb(start = opt2BMB$par, obj = fn, gr=gr,
+                             control=list(trace=10)))
 
-library(tmbstan)
-t1 <- tmbstan(obj, init="last.par.best")
-#Next step is to go pseudo Bayesian and kinda play around with priors ect ect
-#is tmbstan the way to go? Is tmbstan just stan that accepts tmb objects
-#(do I have to change the object? unclear from examples if its a model build or nll optimizer)
-#https://cran.r-project.org/web/packages/glmmTMB/vignettes/mcmc.html
-#Am I just going to be using NUTS?
+optBMB$par 
+##LL of 1219.97
+#log_d           theta            logit_rho    log_offsetparam    logsd_Year    logsd_County
+#-11.2104551       0.2622527      -1.2418091      -3.8789451      -1.0126715  -354.8913564 
 
-#Are simulations in the TMB model worth doing or are the ones in R fine?
+obj2$fn(optBMB$par)
+#Works but seems vastly different from the original step by step TMB
+
+
+compile("scripts/stepbystepwithpriors.cpp")
+dyn.load(dynlib("scripts/stepbystepwithpriors"))
+
+dd1 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
+            fullcountyincidence = countylist, dmean = 80, dsd = 23.33, thetamean = 1.5, thetasd = 0.4166, offsetmean = 0.5, offsetsd = 0.15)
+pp1 <- list(log_d = log(dparam), theta = thetaparam, logit_rho = qlogis(rhoparam),  log_offsetparam = log(a),
+            logsd_County = 0, logsd_Year = 0,
+            YearRandomEffect = yeareffect, CountyRandomEffect = countyeffect)
+
+obj3 <- MakeADFun(data=dd1, parameters=pp1, DLL="stepbystepwithpriors",
+                  silent=TRUE,
+                  random=c("YearRandomEffect","CountyRandomEffect"))
+
+optprior <- with(obj3, nlminb(start = par, obj = fn, gr=gr,
+                            control=list(trace=10)))
+
+ opt2BMB <- optim(par = optBMB$par, fn = obj2$fn, gr = obj2$gr, method = "BFGS", control=list(trace=TRUE))
+
+
+#Looking at Azzalini with optim params
+distmat <- read.csv("data/distancematrix.csv")
+distmat2 <- distmat[,-1]
+rownames(distmat2) <- colnames(distmat2)
+d1 <- as.matrix(distmat2)
+diag(d1) <- 0
+
+
+cutoffpoint <- exp(-(900/exp(-10.75))^0.26)
+azzelinifun <- exp(-((d1)/exp(-10.75))^0.262)
+diag(azzelinifun) <- 0
+azzelinifun[(azzelinifun < cutoffpoint)] <- 0
+
+#Now to weight matrix
+localcountymat.w <- mat2listw(azzelinifun, style = "W")
+localcountymat.m <- as(localcountymat.w, "CsparseMatrix") 
+localcountymat <- as.matrix(localcountymat.m)
+
