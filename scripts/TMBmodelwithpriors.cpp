@@ -49,8 +49,8 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     //DATA_SCALAR(logoffsetpriorlowr);
     //DATA_SCALAR(logoffsetsd);
     
-    //DATA_SCALAR(offsetmean);
-    //DATA_SCALAR(offsetsd);
+    DATA_SCALAR(rhomin);
+    DATA_SCALAR(rhomax);
     // then nll -= dnorm(rho, rho_mean, rho_sd) in the code below ...
     // could even pass log_d_lwr, log_d_upr, log_d_sdrange as 'data'
     
@@ -90,61 +90,55 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     //Begin my applying azzalini parameter
     matrix<Type> azzalinimat(dim, dim);
     azzalinimat.setZero();
-    for(int i = 0; i < dim; i++){
-      for(int j=0; j < dim; j++){
-        // do we need these defs? substitute directly into azzalinimat() calc?
+    for(int i = 0; i < dim - 1; i++){
+      for(int j= i + 1 ; j < dim; j++){
         Type currentval = dist(i,j); 
         Type hyperparam = -1* pow(currentval/d , theta);
-        azzalinimat(i,j) = hyperparam;
+        // BMB: can we exponentiate at this step??
+        azzalinimat(i,j) = azzalinimat(j,i) = exp(hyperparam);
       }
     }
-    
-    matrix<Type> azzaliniexp = exp(azzalinimat.array());
-    
-    //Now I want to set diag of matrix equal to 0
-    //This gets number of elements not size of matrix FIX ME
-    for(int i = 0; i < dim; i++) {
-      azzaliniexp(i,i) = 0;
-    }
+    //No longer have to set the diag to 0 bc its already 0
     
     //Create row sum 1 weight matrix of azzalini distances
     matrix<Type> weightedmatrix(dim, dim);
     weightedmatrix.setZero();
     for(int i = 0; i < dim; i++){
-      vector<Type> currentrow = azzaliniexp.row(i);
+      vector<Type> currentrow = azzalinimat.row(i);
       Type sumofvec = currentrow.sum();
       vector<Type> newrow = currentrow / sumofvec;
       //Reattach the weighted vector to the weightedmatrx
       weightedmatrix.row(i) = newrow;
     }
     
-    for(int i = 0; i < (numberofyears - 1); i++){
-      //Extracting shared users for a given year LOOK INTO BLOCK ARGUMENTS AGAIN
-      matrix<Type> currentsharedusers = SM.block(0 , i*dim, dim , dim); //Block from 0th row 548*(i-1) col taking 548 row and 548 col
+    //Now creating
+    for (int year = 0; year < (numberofyears - 1); year++) {
+      //Extracting shared users for a given year 
+      matrix<Type> currentsharedusers = SM.block(0 , year*dim, dim , dim); //Block from 0th row 548*(i-1) col taking 548 row and 548 col
       //Block starting at (0,0) taking 548 rows, 548 cols
       
       matrix<Type> suplusdist = (rho * currentsharedusers) + ((1-rho) * weightedmatrix);
       //Extracting incidence for a given year LOOK INTO IF ITS 1XN OR NX1
-      matrix<Type> incidenceofyear = fullcountyincidence.block(0, i, dim, 1); //block from 0th row and ith col taking 548 row and just that col. 
+      matrix<Type> incidenceofyear = fullcountyincidence.block(0, year, dim, 1); //block from 0th row and ith col taking 548 row and just that col. 
       matrix<Type> FOIforayear = suplusdist * incidenceofyear;
-      //Makes sense so far
-      //FAKE REVELATION: I can use STD libarary
-      //FOI.col(i) = (FOIforayear.col(0));
       
-      matrix<Type> incidenceofnextyearmatrix = fullcountyincidence.block(0, i + 1, dim, 1);
-      vector<Type> incidenceofnextyearvec = incidenceofnextyearmatrix.col(0);
-      for(int j = 0; j < dim; j++){
-        if(fullcountyincidence(j,i) == 0){
-          Type individFOIforayear = FOIforayear(j,0);
+      // FIXME: if we do the azzalini matrix calculation and the shared-user calculation
+      // *inside* the (if uninfected) block, then we don't have to do any of those calculations
+      // for (year, target county) combinations where the county is already infected
+      for (int county = 0; county < dim; county++) {
+        if (fullcountyincidence(county,year) == 0) {
+          
+          // compute azzalini distances, scale them, add up shared-users for this
+          // county and all other counties in this year, etc.
+          
+          Type individFOIforayear = FOIforayear(county,0);
           Type logFOIforayear = log(individFOIforayear + offsetparam);
-          Type linearpred = logFOIforayear + YearRandomEffect(i) + CountyRandomEffect(j);
+          Type linearpred = logFOIforayear + YearRandomEffect(year) + CountyRandomEffect(county);
           Type logit_prob = logit_invcloglog(linearpred);
-          Type incidenceofnextyear = incidenceofnextyearvec(j);  // unnecessary/merge into nll calc?
-          //incidenceofnextyear = countylist.block(0, i+1, ...)
-          nll -= dbinom_robust(incidenceofnextyear, Type(1.0), logit_prob, true);
-        }
-      }
-    }
+          nll -= dbinom_robust(fullcountyincidence(county,year+1), Type(1.0), logit_prob, true);
+        } // uninfected counties
+      } // loop over counties
+    } // loop over years
     
     // technical issue, when we get to Stan-world, that it's better to make the random effects UNSCALED
     // (i.e. random effects are N(0,1), we multiply by sd before adding them to the linear predictor
@@ -167,8 +161,15 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     // Offset!  
     // logit-normal, not so wide that there are big peaks at 0/1
     // probably mean at 0 (=0.5 proportion)
-   // nll -= logitnorm(offsetparam, offsetmean, offsetsd, true);
+    // nll -= logitnorm(offsetparam, offsetmean, offsetsd, true);
+    
+    //rho
+    //Want uniform prior (just like not adding a prior at all?)
+    //should I enter the bounds as data or just hard code them? probably doesnt matter
+    //Do it in data just in case
+    nll -= dunif(logit_rho, rhomin, rhomax, false);
+    
+    
     
     return nll;
   }
-  
