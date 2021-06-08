@@ -44,10 +44,9 @@ set.seed(1313)
 cores <- parallel::detectCores()
 options(mc.cores = cores)
 stepbysteppriorsstan <- tmbstan(obj3) #should I be setting init??? 
-#It doesnt finish..... ugh 
+#It doesnt exist?????
 
 saveRDS(stepbysteppriorsstan, "data/stepbysteppriorstan.RDS")
-#obj3stan <- readRDS("data/stepbysteppriorSTAN.RDS")
-#shinystan::launch_shinystan(obj3stan)
+
 
 
