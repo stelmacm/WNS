@@ -35,24 +35,11 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     DATA_MATRIX(fullcountyincidence);
     
     // external prior values
-    //DATA_SCALAR(logdpriorupr);
-    //DATA_SCALAR(logdpriorlowr);
-    //DATA_SCALAR(logdpriorsd);
-    DATA_SCALAR(dmean);
-    DATA_SCALAR(dsd);
-    //DATA_SCALAR(thetapriorupr);
-    //DATA_SCALAR(thetapriorlowr);
-    //DATA_SCALAR(thetapriorsd);
-    DATA_SCALAR(thetamean);
-    DATA_SCALAR(thetasd);
-    //DATA_SCALAR(logoffsetpriorupr);
-    //DATA_SCALAR(logoffsetpriorlowr);
-    //DATA_SCALAR(logoffsetsd);
-    
-    DATA_SCALAR(rhomin);
-    DATA_SCALAR(rhomax);
-    // then nll -= dnorm(rho, rho_mean, rho_sd) in the code below ...
-    // could even pass log_d_lwr, log_d_upr, log_d_sdrange as 'data'
+    DATA_SCALAR(dpriormean);
+    DATA_SCALAR(dpriorscalingparam);
+    DATA_SCALAR(thetapriorpower);
+
+  
     
     //Import Parameters
     PARAMETER(log_d);  // e.g. dnorm; range is log(10 km) - log(1000 km), mean in the middle,
@@ -148,28 +135,17 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     nll -= sum(dnorm(YearRandomEffect, Type(0), exp(logsd_Year), true));
     nll -= sum(dnorm(CountyRandomEffect, Type(0), exp(logsd_County), true));
     
-    // Priors mean changing 
-    // Scaling param
-    // e.g. dnorm; range is log(10 km) - log(1000 km), mean in the middle,
-    // SD = (max-min)/6 to make this range be +/- 3 SD = 0.997 of the prob
-    nll -= dnorm(log_d, dmean, dsd, true);
-    // Theta
-    // reasonable range for this is 0.5-3
-    // might want to make this log-scale as well;
-    // use the same trick as above, i.e. range log(0.5)-log(3)  
-    nll -= dnorm(theta, thetamean, thetasd, true);
-    // Offset!  
-    // logit-normal, not so wide that there are big peaks at 0/1
-    // probably mean at 0 (=0.5 proportion)
-    // nll -= logitnorm(offsetparam, offsetmean, offsetsd, true);
-    
-    //rho
-    //Want uniform prior (just like not adding a prior at all?)
-    //should I enter the bounds as data or just hard code them? probably doesnt matter
-    //Do it in data just in case
-    nll -= dunif(logit_rho, rhomin, rhomax, false);
-    
-    
+    //Implementing the general exponential distribution
+    // nll -= - theta * (x - x_0)/d (because its the log of the azzalini bubble)
+    // Trick -> nll -= - theta -> nll += theta
+    nll -= -thetapriorpower * (pow(sqrt(log_d - dpriormean),2)/dpriorscalingparam); //need it to be absolute
+    //x0 = mean upr and lwr
+    //x = the d scaling param
+    //thetaprior = power param from fancy calc
+    //dprior scale param from fancy calc
+    // x = actual scale param from the model
     
     return nll;
   }
+//(x < 0 ? -1*x : x ) <- find in cppAD
+//CppAD::CondExpLt {Lt, Le, Gt, Ge} 
