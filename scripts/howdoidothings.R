@@ -1,20 +1,72 @@
-#Testing out different TMB objects and basically going to compare the objects based on their priors
-#And doing spatial simulations based on the optim results
+#June 11th meeting with BMB
+#Lets start by going over the MCMC of the normal stan model.
+#It had run twice. Once on mine once on BMB machine.
+#One had 1 divergent the other had 101 divergent
+
+source("scripts/stansamplesvsdistributions.R")
+#Plots of the first objects... (1 divergent)
+pairs1
+plot(firststan)
+#PLots of the 2nd objects...(101 divergent)
+pairs2
+plot(secondstan) #I dont know why rho doesnt plot over itself
+
+ggplot() +
+  geom_density(data = as.data.frame(list_of_draws2$logit_rho), aes(list_of_draws2$logit_rho), fill = "blue", alpha = 0.2)+
+  ggtitle("Rho Parameter")
+
+
+#Quick side note:
+#I could not even create the 0 kernel azzalini matrix. lme4 and glmmtmb would say its a really bad answer
+#But they dont give the "cliff answer" and I have played around to try and find where that cliff answer comes from
+#and so far no luck. I am unsure as to where it is. I kind of want to push past it into the next big problem that I am having
 
 source("scripts/creatingfunctiondf.R")
 library(TMB)
+compile("scripts/TMBmodelwithpriors.cpp")
+dyn.load(dynlib("scripts/TMBmodelwithpriors"))
 
-#When I adjust my priors and run stuff 
-compile("scripts/stepbystepwithpriors.cpp")
-dyn.load(dynlib("scripts/stepbystepwithpriors"))
+#Model has power exponential. Need to have fancy code from BMB to see what that bubble looks like
 
-distmean <- function(lower, upper){
-  distmiddle <- mean((lower:upper))
-  distsd <- (upper - lower)/6
-  return(list(distmiddle = distmiddle, distsd = distsd))
+get_gnorm <- function(lwr=-1, upr=1, tail_prob=2*pnorm(lwr),
+                      ctr_prob=abs(diff(pnorm(c(-1,1)*lwr/2)))) {
+  require("gnorm")
+  ## default tail_prob/ctr_prob assume lwr/upr symmetric around 0 ...
+  ## start from Gaussian
+  ## desired alpha
+  sd <- abs(upr-lwr)/(-2*qnorm(tail_prob/2))
+  ## convert to sd (?pgnorm)
+  ## conversion factor: sqrt(1/(gamma(3/2)/(gamma(1/2))))
+  alpha <- sd*sqrt(2)
+  mu <- (lwr+upr)/2 ## symmetric, we don't have to estimate this
+  start <- c(alpha=alpha, beta=2)
+  tfun <- function(x) {
+    ## compute probability within range
+    pfun <- function(r) abs(diff(vapply(r,
+                                        function(z) do.call("pgnorm",c(list(z, mu=mu), as.list(x))),
+                                        FUN.VALUE=numeric(1))))
+    tail_obs <- 1-pfun(c(upr,lwr))
+    ctr_range <- c((mu+lwr)/2, (mu+upr)/2)
+    ctr_obs <- pfun(ctr_range)
+    return((tail_prob-tail_obs)^2 + (ctr_prob-ctr_obs)^2)
+  }
+  return(c(mu=mu,optim(par=start,fn=tfun)$par))
 }
 
-distpriors <- distmean(10, 1000)
+val <- get_gnorm(lwr = -1, upr = 3)
+
+xs <- seq(-2, 2, length.out = 100)
+plot(xs, dgnorm(xs, mu = val[1], alpha = val[2], beta = val[3]), type = "l", 
+     xlab = "x", ylab = expression(p(x)))
+
+plot(xs, dgnorm(xs, mu = 0, alpha = 1.25, beta = 4), type = "l", 
+     xlab = "x", ylab = expression(p(x)))
+#So I need to include a scaling param and a power param to the data
+#And that comes from the function
+#power param = thetaprior -> beta
+#expscaleparam = dpriorscalingparam -> alpha
+#How to determine shape??
+#I kinda like 1 and 4 idek why
 
 countyeffect = rep(0,548)
 yeareffect = rep(0,13)
@@ -23,76 +75,23 @@ thetaparam = 1.4
 rhoparam = 0.6  
 a = 0.001
 
-distcenter <- distpriors$distmiddle
-distdev <- distpriors$distsd
 #It does not accept the values from the function into the list? Get NaN for obj3$fn(obj3$par)
-dd1 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
-            fullcountyincidence = countylist, dmean = log(distcenter), dsd = log(distdev),
-            thetamean = 1.25, 
-            thetasd = .4583)#, offsetmean = 0.5, offsetsd = 0.15)
+dd0 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
+            fullcountyincidence = countylist, dpriormean = log(50), dpriorscalingparam = 1.25, thetapriorpower = 4)
 #Hard coded offset priors bc logitnormal looks like something I dont want to play with too much
 
-pp1 <- list(log_d = log(dparam), theta = thetaparam, logit_rho = qlogis(rhoparam),  log_offsetparam = log(a),
+pp0 <- list(log_d = log(dparam), theta = thetaparam, logit_rho = qlogis(rhoparam),  log_offsetparam = log(a),
             logsd_County = 0, logsd_Year = 0,
             YearRandomEffect = yeareffect, CountyRandomEffect = countyeffect)
 
-obj <- MakeADFun(data=dd1, parameters=pp1, DLL="stepbystepwithpriors",
-                  silent=TRUE,
-                  random=c("YearRandomEffect","CountyRandomEffect"))
+expriorobj <- MakeADFun(data=dd0, parameters=pp0, DLL="TMBmodelwithpriors",
+                        silent=TRUE, 
+                        random=c("YearRandomEffect","CountyRandomEffect"))
+expriorobj$fn(expriorobj$par)
 
-#optprior <- with(obj, nlminb(start = par, obj = fn, gr=gr,control=list(trace=10)))
-#6.22720, 1.25011, -0.640884, -3.67401 with LL 1320.9936
-exp(6.22720)
-distcenter
-
-distpriors2 <- distmean(10, 1200)
-
-distcenter2 <- distpriors2$distmiddle
-distdev2 <- distpriors2$distsd
-#It does not accept the values from the function into the list? Get NaN for obj3$fn(obj3$par)
-dd2 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
-            fullcountyincidence = countylist, dmean = log(distcenter2), dsd = log(distdev2),
-            thetamean = 1.25, 
-            thetasd = .4583)
-
-obj2 <- MakeADFun(data=dd2, parameters=pp1, DLL="stepbystepwithpriors",
-                  silent=TRUE,
-                  random=c("YearRandomEffect","CountyRandomEffect"))
-
-#optprior2 <- with(obj2, nlminb(start = par, obj = fn, gr=gr,
-#                              control=list(trace=10)))
-#6.40464, 1.25, -.640933, -3.67403 with LL 1321.029
-exp(6.40464)
-distcenter2
-
-x <- seq(50, 1500, length=1000)
-y <- dnorm(x, mean=625, sd=191.66)
-plot(x, y, type="l", lwd=1)
-
-
-x1 <- seq(0, 3, length=1000)
-y1 <- dnorm(x1, mean=1.25, sd=.466)
-plot(x1, y1, type="l", lwd=1)
-
-source("scripts/spatialstatsforsims.R")
-
-#obj sim stats
-ff$maxdist
-ff$meandist
-ff$infayear
-
-#obj2 sim stats 
-gg$maxdist
-gg$meandist
-gg$infayear
-
-
-
-#Questions are still in terms of priors.
-#Like we see each parameter just going to the mean of each distribution
-#I would like to think that although it seems kind of fishy the answer is reasonable
-#I really can't figure out what to do about it
-#Would like to go over stan model as well
-library(shinystan)
-obj3stan <- readRDS("data/stepbysteppriorSTAN.RDS")
-shinystan::launch_shinystan(obj3stan)
+#NaN but I have no idea why
+#OK so NaN occurs when we have too large a value for the prior mean. Gotcha. I feel like now I am more confused about the prior
+#I dont understand what to make it since my range doesnt work...
+#So @ dpriormean = log(50) changing the shape of the prior doesnt change the LL
+#dpriormean = log(40) makes LL worse...
+#dpriomean = log(60) makes LL NaN
