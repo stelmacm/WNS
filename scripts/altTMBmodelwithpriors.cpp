@@ -25,6 +25,7 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     tx[0] = x;
     return logit_invcloglog(tx)[0];
   }
+  
   template<class Type>
   Type objective_function <Type>::operator() () {
     //Import data
@@ -44,10 +45,10 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     DATA_SCALAR(offsetsd);
     DATA_SCALAR(thetapriorscale); //on theta
     DATA_SCALAR(thetapowerscale); // on theta
-    DATA_SCALAR(thetamean);
-    
-    //Import Parameters
-    PARAMETER(log_d);  // e.g. dnorm; range is log(10 km) - log(1000 km), mean in the middle,
+    DATA_SCALAR(thetamean); //on theta 
+      
+      //Import Parameters
+      PARAMETER(log_d);  // e.g. dnorm; range is log(10 km) - log(1000 km), mean in the middle,
     // SD = (max-min)/6 to make this range be +/- 3 SD = 0.997 of the prob
     PARAMETER(theta);  // reasonable range for this is 0.5-3
     // might want to make this log-scale as well;
@@ -137,8 +138,8 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     // rather than SCALED (i.e. random effects are N(0,sd), we add them directly to the LP)
     // ... we may want to leave these as N(0,1)
     // we could ADREPORT() a scaled version of the random effects, for convenience
-    nll -= sum(dnorm(YearRandomEffect, Type(0), exp(logsd_Year), true));
-    nll -= sum(dnorm(CountyRandomEffect, Type(0), exp(logsd_County), true));
+    nll -= sum(dlnorm(YearRandomEffect, Type(0), exp(logsd_Year), true));
+    nll -= sum(dlnorm(CountyRandomEffect, Type(0), exp(logsd_County), true));
     
     //Implementing the general exponential distribution
     // nll -= - theta * (x - x_0)/d (because its the log of the azzalini bubble)
@@ -162,10 +163,8 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     // Gaussian prior on offset
     //This one will be tricky because the range is so big for it!
     nll -= dnorm(offsetparam, offsetmean, offsetsd, true);
-    
-    //Now going to test with lognormal priors on random effects
-    
+  
     return nll;
   }
-//(x < 0 ? -1*x : x ) <- find in cppAD
-//CppAD::CondExpLt {Lt, Le, Gt, Ge} 
+  //(x < 0 ? -1*x : x ) <- find in cppAD
+  //CppAD::CondExpLt {Lt, Le, Gt, Ge} 
