@@ -1,30 +1,10 @@
-#June 11th meeting with BMB
-#Lets start by going over the MCMC of the normal stan model.
-#It had run twice. Once on mine once on BMB machine.
-#One had 1 divergent the other had 101 divergent
+#Running the new TMBmodelwithpriors.cpp
+#This is combining the BMBmodel with with step by step model
 
-source("scripts/stansamplesvsdistributions.R")
-#Plots of the first objects... (1 divergent)
-pairs1
-plot(firststan)
-#PLots of the 2nd objects...(101 divergent)
-pairs2
-plot(secondstan) #I dont know why rho doesnt plot over itself
-
-ggplot() +
-  geom_density(data = as.data.frame(list_of_draws2$logit_rho), aes(list_of_draws2$logit_rho), fill = "blue", alpha = 0.2)+
-  ggtitle("Rho Parameter")
-
-
-#Quick side note:
-#I could not even create the 0 kernel azzalini matrix. lme4 and glmmtmb would say its a really bad answer
-#But they dont give the "cliff answer" and I have played around to try and find where that cliff answer comes from
-#and so far no luck. I am unsure as to where it is. I kind of want to push past it into the next big problem that I am having
-
-source("scripts/creatingfunctiondf.R")
 library(TMB)
 compile("scripts/TMBmodelwithpriors.cpp")
 dyn.load(dynlib("scripts/TMBmodelwithpriors"))
+source("scripts/creatingfunctiondf.R")
 
 #Model has power exponential. Need to have fancy code from BMB to see what that bubble looks like
 
@@ -77,21 +57,58 @@ a = 0.001
 
 #It does not accept the values from the function into the list? Get NaN for obj3$fn(obj3$par)
 dd0 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
-            fullcountyincidence = countylist, dpriormean = log(50), dpriorscalingparam = 1.25, thetapriorpower = 4)
-#Hard coded offset priors bc logitnormal looks like something I dont want to play with too much
+            fullcountyincidence = countylist, dpriormean = log(505), dpriorscalingparam = 1.25, thetapriorpower = 4,
+            rhomean = plogis(0), rhostd = plogis(3), offsetmean = log(1.1), offsetsd = log(1.01), thetamean = 1.25, 
+            thetapriorscale = 5.656854, thetapowerscale = 2)
+#dpriorscalingparam is for d
+#thetapriorpower is for d
+#thetapower is for theta
+#dscalingparam is for theta 
 
 pp0 <- list(log_d = log(dparam), theta = thetaparam, logit_rho = qlogis(rhoparam),  log_offsetparam = log(a),
             logsd_County = 0, logsd_Year = 0,
             YearRandomEffect = yeareffect, CountyRandomEffect = countyeffect)
 
 expriorobj <- MakeADFun(data=dd0, parameters=pp0, DLL="TMBmodelwithpriors",
+                  silent=TRUE, 
+                  random=c("YearRandomEffect","CountyRandomEffect"))
+expriorobj$fn(expriorobj$par)
+expriorobj$gr(expriorobj$par)
+
+nlminboptpriorexp <- with(expriorobj, nlminb(start = par, obj = fn, gr=gr,
+                                    control=list(trace=10)))
+
+#library(tmbstan)
+#expstanobj <- tmbstan(expriorobj)
+#saveRDS(object = expstanobj, file =  "data/TMBmodelwithpriorsstan.RDS")
+
+#Is this was perfection is?
+#theta always goes to whatever the thetapower is so idk
+
+#Now we try the second verion
+compile("scripts/altTMBmodelwithpriors.cpp")
+dyn.load(dynlib("scripts/altTMBmodelwithpriors"))
+
+dd1 <- list(dist = orderedmat, dim = 548, SM = bigsharedusers, numberofyears = 13,
+            fullcountyincidence = countylist, dpriormean = log(505), dpriorscalingparam = 1.25, thetapriorpower = 4,
+            rhomean = plogis(0), rhostd = plogis(3), offsetmean = log(1.1), offsetsd = log(1.01))
+
+expriorobj2 <- MakeADFun(data=dd1, parameters=pp0, DLL="altTMBmodelwithpriors",
                         silent=TRUE, 
                         random=c("YearRandomEffect","CountyRandomEffect"))
-expriorobj$fn(expriorobj$par)
+expriorobj2$fn(expriorobj2$par)
+expriorobj2$gr(expriorobj2$par)
 
-#NaN but I have no idea why
-#OK so NaN occurs when we have too large a value for the prior mean. Gotcha. I feel like now I am more confused about the prior
-#I dont understand what to make it since my range doesnt work...
-#So @ dpriormean = log(50) changing the shape of the prior doesnt change the LL
-#dpriormean = log(40) makes LL worse...
-#dpriomean = log(60) makes LL NaN
+nlminboptpriorexp2 <- with(expriorobj2, nlminb(start = par, obj = fn, gr=gr,
+                                             control=list(trace=10)))
+#Also goes to theta = 4....
+#hmmmm
+
+exp(- (500/505)^4)
+exp(- (1000/505)^4)
+exp(- (50/505)^4)
+
+#Now I am thinking about adding priors to the random effects
+#The random effects look really really Gaussian
+#I dont know what we want from this and what we think this will do for us
+plnorm(3, meanlog = 0, sdlog = 1)
