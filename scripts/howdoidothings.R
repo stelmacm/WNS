@@ -47,6 +47,13 @@ thetaplot <- ggplot() +
   ggtitle("Theta Parameter")
 thetaplot
 
+REsamples <- data.frame(val = rnorm(4000, mean = log(1.5), sd = log(1.07)))
+REplot <- ggplot() +
+  geom_density(data = REsamples, aes(val), alpha = 0.2, fill = "red") +
+  geom_density(data = as.data.frame(list_of_draws3$logsd_County), aes(list_of_draws3$logsd_County), fill = "blue", alpha = 0.2) +
+  ggtitle("CountySD Parameter")
+REplot
+
 #kind of pointy but seems cool.
 #Everything seems great about this except for the low-ish n-eff of logcounty_sd (random effects prior)
 shinystan::launch_shinystan(bestmodel)
