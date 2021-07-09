@@ -120,7 +120,8 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
           
           Type individFOIforayear = FOIforayear(county,0);
           Type logFOIforayear = log(individFOIforayear + offsetparam);
-          Type linearpred = logFOIforayear + YearRandomEffect(year) + CountyRandomEffect(county);
+          Type linearpred = logFOIforayear + exp(logsd_Year)*YearRandomEffect(year) +
+		  exp(logsdCounty)*CountyRandomEffect(county);
           Type logit_prob = logit_invcloglog(linearpred);
           nll -= dbinom_robust(fullcountyincidence(county,year+1), Type(1.0), logit_prob, true);
         } // uninfected counties
@@ -132,8 +133,8 @@ px[0] = exp( logspace_add(tx[0], tx[0]-ty[0]) ) * py[0];
     // rather than SCALED (i.e. random effects are N(0,sd), we add them directly to the LP)
     // ... we may want to leave these as N(0,1)
     // we could ADREPORT() a scaled version of the random effects, for convenience
-    nll -= sum(dnorm(YearRandomEffect, Type(0), exp(logsd_Year), true));
-    nll -= sum(dnorm(CountyRandomEffect, Type(0), exp(logsd_County), true));
+    nll -= sum(dnorm(YearRandomEffect, Type(0), 1, true));
+    nll -= sum(dnorm(CountyRandomEffect, Type(0), 1), true));
     
     //Implementing the general exponential distribution
     // nll -= - theta * (x - x_0)/d (because its the log of the azzalini bubble)
