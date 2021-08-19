@@ -61,6 +61,8 @@ for (i in levels(mixedmodeldf$year)){
   sharedusers[[i]] <- removingcounty[,-1]
 }
 
+countysharedusers <- array(as.numeric(unlist(sharedusers)), dim = )
+
 #13 levels
 bigsharedusers <- cbind(sharedusers[[1]], sharedusers[[2]])
 bigsharedusers <- cbind(bigsharedusers, sharedusers[[3]])
@@ -76,6 +78,9 @@ bigsharedusers <- cbind(bigsharedusers, sharedusers[[12]])
 bigsharedusers <- cbind(bigsharedusers, sharedusers[[13]])
 #write.csv(bigsharedusers, "data/bigsharedusers.csv")
 bigsharedusers <- as.matrix(bigsharedusers) #This is the shared users I want for TMB
+
+#Quickly creating the same thing but Sparse
+bigshareduserssparse <- as(bigsharedusers, "sparseMatrix")
 
 #Also taking the classic d1 mat
 #import and create distance matrix
@@ -146,3 +151,44 @@ random_vec <- rep(0,length(newdf))
 random_vec2 <- rep(0,length(newdf))
 incidence <- as.vector(newdf$incidence)
 
+#Non-row normalized shared users matrix
+numbersharedcountiesusers2 <- read_csv("data/numbersharedcountiesusers.csv") %>%
+  dplyr::select(-X1) %>% mutate(year = factor(year))
+
+sharedusersperyear2 <- list()
+for (i in levels(mixedmodeldf$year)) {
+  #Could ultimately do this outside of for loop since its always constant and have a list of vectors inside
+  sharedusersperyear2[[i]] <- (numbersharedcountiesusers2 %>% filter(year == i) %>%
+                                dplyr::select(-year))
+}
+
+sharedmatrix2 <- list()
+sharedusers2 <- list()
+for (i in levels(mixedmodeldf$year)){
+  #perfect
+  sharedmatrix2[[i]] <- dcast(sharedusersperyear2[[i]], county ~ county2, value.var = "num.shared")
+  #Works because 1st column is names is row 1
+  removingcounty <- sharedmatrix2[[i]]
+  sharedusers2[[i]] <- removingcounty[,-1]
+}
+
+countysharedusers2 <- array(as.numeric(unlist(sharedusers2)))
+
+#13 levels
+notrownormbigsharedusers <- cbind(sharedusers[[1]], sharedusers2[[2]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[3]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[4]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[5]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[6]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[7]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[8]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[9]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[10]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[11]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[12]])
+notrownormbigsharedusers <- cbind(notrownormbigsharedusers, sharedusers2[[13]])
+#write.csv(bigsharedusers, "data/bigsharedusers.csv")
+notrownormbigsharedusers <- as.matrix(notrownormbigsharedusers) #This is the shared users I want for TMB
+
+#Quickly creating the same thing but Sparse
+notrownormbigshareduserssparse <- as(notrownormbigsharedusers, "sparseMatrix")
