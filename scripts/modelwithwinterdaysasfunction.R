@@ -1,5 +1,6 @@
-#R script that will include the new testing of the differently created model
-#Need to start by creating a non-row normalized shared users matrix
+#modelwithwinterdays.R but as function
+#So it becomes modelasfunctionwithwinterdays.R
+
 source("scripts/packages.R")
 
 mixedmodeldf <- read.csv("data/incidencepercounty.csv") %>%
@@ -72,11 +73,27 @@ for(i in levels(mixedmodeldf$year)){
 foidf <- county.incidence.by.year %>% filter(year == 2010) %>%
   dplyr::select(county)
 
+frenchify <- function(countydf){
+  countydf[countydf == "La C\x99te-De-Gasp\x8e-Quebec"] <- "La Côte-De-Gaspé-Quebec"
+  countydf[countydf == "L'\x83rable-Quebec"] <- "L'Érable-Quebec"
+  countydf[countydf == "Lotbini̬re-Quebec"] <- 'Lotbinière-Quebec'
+  countydf[countydf == "Le Haut-Saint-Laurent-Qu̩bec"] <- 'Le Haut-Saint-Laurent-Québec'
+  countydf[countydf == "Memphr̩magog-Quebec"] <- 'Memphrémagog-Quebec'
+  countydf[countydf == "Le Haut-Saint-Fran\x8dois-Quebec"] <- 'Le Haut-Saint-François-Quebec'
+  countydf[countydf == "Antoine-Labelle-Qu̩bec"] <- 'Antoine-Labelle-Québec'
+  countydf[countydf == "La C̫te-de-Beaupr̩-Qu̩bec"] <- 'La Côte-de-Beaupré-Québec'
+  return(countydf)
+}#OK
 
-### Now we build the actual model function ###
-#only question is to row normalize before or after applying the azzalini param
+foidf <- frenchify(foidf)
 
-modelbuild <- function(p) {
+wintercountyperyear <- read.csv("data/winterdayspercountyperyear.csv") %>% 
+  rename("winterdays" = "listofwinterdays2007") %>% mutate(year = factor(year))
+
+#Mixed model formula
+
+
+winterizedmodelbuild <- function(p) {
   ## unpack parameter vector, via link functions
   cat(p,"\n")
   d <- exp(p[1])   ## identity (no constraint, we'll hope we don't hit 1.0 exactly)
@@ -85,7 +102,7 @@ modelbuild <- function(p) {
   rho <- plogis(p[4])     ##between 0 and 1
   #cutoffpoint <- (1/exp(p[4]))
   #cutoffpoint <- (1e-300)
-  
+  cat(d,theta,a,rho,"\n")
   azzelinifun <- exp(-((d1)/d)^theta)
   diag(azzelinifun) <- 0
   #azzelinifun[(azzelinifun < cutoffpoint)] <- 0
@@ -117,48 +134,27 @@ modelbuild <- function(p) {
   modeldataframe$year <- factor(modeldataframe$year)
   modeldataframe$previnf <- (lag(modeldataframe$foi))
   
+  #Add winter to the model
+  newmodeldf <- left_join(modeldataframe, wintercountyperyear, by = c("county", "year"))
+  
   #Changing to disappear after incidence occures
-  newdf <- modeldataframe %>%
+  newdf <- newmodeldf %>%
     filter(year != "2006") %>% subset((incidence == 0) | (incidence == 1 & previousyear == 0))
   
-  #Mixed model formula
-  formula <- incidence ~ (1|year) + (1|county) + offset(log(previnf + a))
+  formula <- incidence ~ (1|year) + (1|county) + winterdays + offset(log(previnf + a))
   
   foimm <- try(glmer(formula, data = newdf, family = binomial(link = "cloglog")),
                silent=TRUE)
   
   if (inherits(foimm,"try-error")) return(NA_real_)
   optimalloglik <- logLik(foimm)
-  return(foimm)
+  return(optimalloglik)
 }
+pp <- winterizedmodelbuild(c(3.94594302, 1.80933352, -4.81928386,0.02135985))
+pp <- winterizedmodelbuild(c(3.94594302, 1.80933352, -1.81928386,0.02135985))
+summary(pp)
 
-pp <- modelbuild(c(3.94594302, 1.80933352, -4.81928386,0.02135985))
+modelobjoptima <-optim(par = c(log(50), 1.2, log(0.01), qlogis(0.5)), fn = winterizedmodelbuild, 
+                        control=list(trace=10, maxit = 1000))
 
-modelobjoptima2 <-optim(par = c(log(50), 1.2, log(0.01), qlogis(0.5)), fn = modelbuild, 
-                   control=list(trace=10, maxit = 1000))
-#converges at
-#3.94594302  1.80933352 -4.81928386  0.02135985
-#Looks pretty okay-ish I think... I am still convinced this is a bimodal likelihood surface
-#Very high random effects standard deviation
-
-
-modelobjoptima <- nlminb(start = c(log(9), 1.4, log(0.01), qlogis(0.5)), obj = modelbuild, 
-                  control=list(trace=10))
-
-## SUMMARY OF MLE ##
-#False convergence with nlminb and optim. There is a degerancy at the simplex
-#Not sure what the likelihood surface looks like
-#Kind of want to run a stan model to see what this will end up looking like....
-#Lets first look at what the azzalini bubble will look like
-
-azzelinifun2 <- exp(-((d1)/5)^1.4)
-diag(azzelinifun2) <- 0
-
-view(azzelinifun2)
-
-azzelinimean2 <- mean(rowMeans(azzelinifun2))
-azzelinimean2
-azzeliniprime2 <- azzelinifun2 / azzelinimean2
-view(azzeliniprime2)
-orderedmat2 <- azzeliniprime2[sort(rownames(azzeliniprime2)),sort(colnames(azzeliniprime2))]
-view(orderedmat2)
+#Print/save ridic values parameters in a list 
